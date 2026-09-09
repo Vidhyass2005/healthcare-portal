@@ -45,32 +45,9 @@ A full-stack, enterprise-grade healthcare management application featuring intel
 ### 6. 🌐 Multi-Language Support
 - Full English and Tamil (`தமிழ்`) localization switcher across all UI modules.
 
-### 7. ⚡ Quick 1-Click Demo Persona Bar
-- Instant login as:
-  - **Admin**: `admin@hospital.com` / `Admin@123`
-  - **Doctor (Cardiology)**: `priya.cardio@hospital.com` / `Doctor@123`
-  - **Patient (High Priority)**: `ramesh@gmail.com` / `Patient@123`
-  - **Donor (O- Universal)**: `anand.donor@gmail.com` / `Donor@123`
+nand.donor@gmail.com` / `Donor@123`
 
----
 
-## 🚀 Quick Setup & Execution Guide
-
-### Prerequisites
-- Node.js (v18+)
-- MongoDB running locally on port 27017 (or configured in `backend/.env`)
-
-### 1. Start Backend
-```bash
-cd backend
-npm install
-npm run seed     # Seeds sample doctors, patients, donors, blood inventory, and lab tests
-npm start        # Runs on http://localhost:5000
-```
-
-### 2. Start Frontend
-```bash
-cd frontend
 npm install
 npm run dev      # Runs on http://localhost:5173
 ```
