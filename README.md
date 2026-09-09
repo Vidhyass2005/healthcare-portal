@@ -44,12 +44,3 @@ A full-stack, enterprise-grade healthcare management application featuring intel
 
 ### 6. 🌐 Multi-Language Support
 - Full English and Tamil (`தமிழ்`) localization switcher across all UI modules.
-
-nand.donor@gmail.com` / `Donor@123`
-
-
-npm install
-npm run dev      # Runs on http://localhost:5173
-```
-
-Open your browser at **`http://localhost:5173`** to access the application.
