@@ -95,7 +95,25 @@ export const BookLabTestPage = ({ onNavigate }) => {
     }
   };
 
-  const categories = ['All', 'Pathology', 'Biochemistry', 'Radiology', 'Cardiology'];
+  if (user?.role === 'doctor' || user?.role === 'admin') {
+    return (
+      <div className="max-w-md mx-auto my-16 bg-white p-8 rounded-3xl border border-slate-200 shadow-xl text-center space-y-4">
+        <div className="w-14 h-14 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center mx-auto">
+          <AlertCircle className="w-8 h-8" />
+        </div>
+        <h2 className="text-xl font-bold text-slate-900">Patient-Only Service</h2>
+        <p className="text-xs text-slate-500 leading-relaxed">
+          Diagnostic lab test booking is reserved strictly for patients. Doctors can recommend investigations during outpatient consultations, and Administrators manage tests in the Hospital Catalog.
+        </p>
+        <button
+          onClick={() => onNavigate(user.role === 'doctor' ? '/doctor-dashboard' : '/admin-dashboard')}
+          className="bg-sky-600 hover:bg-sky-500 text-white font-bold px-5 py-2.5 rounded-xl text-xs shadow transition"
+        >
+          Return to {user.role === 'doctor' ? 'Doctor Dashboard' : 'Admin Dashboard'}
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-5xl mx-auto py-6 space-y-8 pb-20">

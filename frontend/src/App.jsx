@@ -67,8 +67,12 @@ export function App() {
       case '/donor-dashboard':
         return <DonorDashboard onNavigate={navigate} />;
       case '/book-appointment':
+        if (user.role === 'admin') return <AdminDashboard onNavigate={navigate} />;
+        if (user.role === 'doctor') return <DoctorDashboard onNavigate={navigate} />;
         return <BookAppointmentPage onNavigate={navigate} />;
       case '/lab-tests':
+        if (user.role === 'admin') return <AdminDashboard onNavigate={navigate} />;
+        if (user.role === 'doctor') return <DoctorDashboard onNavigate={navigate} />;
         return <BookLabTestPage onNavigate={navigate} />;
       case '/blood-bank':
         return <BloodPortalPage onNavigate={navigate} />;

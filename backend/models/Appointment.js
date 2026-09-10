@@ -100,6 +100,56 @@ const appointmentSchema = new mongoose.Schema({
     type: [String],
     default: []
   },
+  // Patient Vitals Charting
+  vitals: {
+    bloodPressureSystolic: { type: Number, default: null },
+    bloodPressureDiastolic: { type: Number, default: null },
+    pulseHeartRate: { type: Number, default: null },
+    oxygenSaturation: { type: Number, default: null },
+    temperature: { type: Number, default: null },
+    heightCm: { type: Number, default: null },
+    weightKg: { type: Number, default: null },
+    bmi: { type: Number, default: null },
+    bmiCategory: { type: String, default: 'Normal' },
+    bloodSugarMgDl: { type: Number, default: null }
+  },
+  // Patient Clinical Alerts & Drug Allergies
+  allergies: {
+    type: [String],
+    default: []
+  },
+  medicalAlerts: {
+    type: [String],
+    default: []
+  },
+  // Cross-Department Outgoing Referral
+  referral: {
+    isReferred: { type: Boolean, default: false },
+    referredToDepartment: { type: String, default: '' },
+    referredToDoctor: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    referredToDoctorName: { type: String, default: '' },
+    referralReason: { type: String, default: '' },
+    referralUrgency: { type: String, enum: ['Routine', 'Urgent', 'Immediate STAT'], default: 'Routine' },
+    referralDate: { type: Date, default: null },
+    referralStatus: { type: String, enum: ['Pending Evaluation', 'Consulted', 'Declined'], default: 'Pending Evaluation' }
+  },
+  // Cross-Department Incoming Referral Flag
+  isReferralPatient: {
+    type: Boolean,
+    default: false
+  },
+  referredByDoctorName: {
+    type: String,
+    default: ''
+  },
+  referredByDepartment: {
+    type: String,
+    default: ''
+  },
+  referralReason: {
+    type: String,
+    default: ''
+  },
   noShowRiskScore: {
     type: Number,
     default: 0.1

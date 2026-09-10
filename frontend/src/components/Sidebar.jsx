@@ -35,8 +35,7 @@ export const Sidebar = ({ currentPath = '/', onNavigate, isOpen, onClose }) => {
       return [
         { path: '/doctor-dashboard', label: t('navDashboard'), icon: LayoutDashboard },
         { path: '/doctor-dashboard?tab=queue', label: t('navDoctorQueue'), icon: Clock, badge: 'Live' },
-        { path: '/blood-bank', label: t('emergencyBloodAlert'), icon: Heart },
-        { path: '/lab-tests', label: t('navLabTests'), icon: FlaskConical }
+        { path: '/blood-bank', label: t('emergencyBloodAlert'), icon: Heart }
       ];
     }
 
@@ -45,8 +44,7 @@ export const Sidebar = ({ currentPath = '/', onNavigate, isOpen, onClose }) => {
         { path: '/admin-dashboard', label: t('navDashboard'), icon: LayoutDashboard },
         { path: '/admin-dashboard?tab=analytics', label: t('navAnalytics'), icon: BarChart3 },
         { path: '/blood-bank', label: t('bloodInventory'), icon: Heart },
-        { path: '/admin-dashboard?tab=users', label: t('navManageUsers'), icon: Users },
-        { path: '/lab-tests', label: t('navLabTests'), icon: FlaskConical }
+        { path: '/admin-dashboard?tab=users', label: t('navManageUsers'), icon: Users }
       ];
     }
 

@@ -356,7 +356,15 @@ exports.cancelAppointment = async (req, res, next) => {
 // @route PUT /api/appointments/:id/status
 exports.updateAppointmentStatus = async (req, res, next) => {
   try {
-    const { status, clinicalNotes, prescriptions, recommendedLabTests } = req.body;
+    const {
+      status,
+      clinicalNotes,
+      prescriptions,
+      recommendedLabTests,
+      vitals,
+      allergies,
+      medicalAlerts
+    } = req.body;
     const appointment = await Appointment.findById(req.params.id);
 
     if (!appointment) {
@@ -367,6 +375,61 @@ exports.updateAppointmentStatus = async (req, res, next) => {
     if (clinicalNotes !== undefined) appointment.clinicalNotes = clinicalNotes;
     if (prescriptions) appointment.prescriptions = prescriptions;
     if (recommendedLabTests) appointment.recommendedLabTests = recommendedLabTests;
+
+    // Vitals processing & BMI calculation
+    if (vitals) {
+      let bmi = vitals.bmi || null;
+      let bmiCategory = vitals.bmiCategory || 'Normal';
+
+      if (vitals.heightCm && vitals.weightKg) {
+        const heightM = Number(vitals.heightCm) / 100;
+        const weight = Number(vitals.weightKg);
+        if (heightM > 0 && weight > 0) {
+          bmi = Number((weight / (heightM * heightM)).toFixed(1));
+          if (bmi < 18.5) bmiCategory = 'Underweight (<18.5)';
+          else if (bmi <= 24.9) bmiCategory = 'Normal (18.5-24.9)';
+          else if (bmi <= 29.9) bmiCategory = 'Overweight (25.0-29.9)';
+          else bmiCategory = 'Obese (≥30.0)';
+        }
+      }
+
+      appointment.vitals = {
+        bloodPressureSystolic: vitals.bloodPressureSystolic ? Number(vitals.bloodPressureSystolic) : null,
+        bloodPressureDiastolic: vitals.bloodPressureDiastolic ? Number(vitals.bloodPressureDiastolic) : null,
+        pulseHeartRate: vitals.pulseHeartRate ? Number(vitals.pulseHeartRate) : null,
+        oxygenSaturation: vitals.oxygenSaturation ? Number(vitals.oxygenSaturation) : null,
+        temperature: vitals.temperature ? Number(vitals.temperature) : null,
+        heightCm: vitals.heightCm ? Number(vitals.heightCm) : null,
+        weightKg: vitals.weightKg ? Number(vitals.weightKg) : null,
+        bmi,
+        bmiCategory,
+        bloodSugarMgDl: vitals.bloodSugarMgDl ? Number(vitals.bloodSugarMgDl) : null
+      };
+
+      // Sync latest vitals to Patient User model
+      const User = require('../models/User');
+      await User.findByIdAndUpdate(appointment.patient, {
+        latestVitals: {
+          ...appointment.vitals,
+          recordedAt: new Date()
+        }
+      });
+    }
+
+    // Allergies & Medical alerts processing
+    if (allergies !== undefined) {
+      const cleanAllergies = Array.isArray(allergies) ? allergies : allergies.split(',').map(s => s.trim()).filter(Boolean);
+      appointment.allergies = cleanAllergies;
+      const User = require('../models/User');
+      await User.findByIdAndUpdate(appointment.patient, { allergies: cleanAllergies });
+    }
+
+    if (medicalAlerts !== undefined) {
+      const cleanAlerts = Array.isArray(medicalAlerts) ? medicalAlerts : medicalAlerts.split(',').map(s => s.trim()).filter(Boolean);
+      appointment.medicalAlerts = cleanAlerts;
+      const User = require('../models/User');
+      await User.findByIdAndUpdate(appointment.patient, { medicalAlerts: cleanAlerts });
+    }
 
     await appointment.save();
 

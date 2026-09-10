@@ -55,6 +55,27 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  allergies: {
+    type: [String],
+    default: []
+  },
+  medicalAlerts: {
+    type: [String],
+    default: []
+  },
+  latestVitals: {
+    bloodPressureSystolic: Number,
+    bloodPressureDiastolic: Number,
+    pulseHeartRate: Number,
+    oxygenSaturation: Number,
+    temperature: Number,
+    heightCm: Number,
+    weightKg: Number,
+    bmi: Number,
+    bmiCategory: String,
+    bloodSugarMgDl: Number,
+    recordedAt: Date
+  },
   // Doctor specific fields
   doctorProfile: {
     department: {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { adminService, bloodService, feedbackService } from '../services/api';
+import { adminService, bloodService, feedbackService, labService } from '../services/api';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -63,6 +63,25 @@ export const AdminDashboard = () => {
   const [selectedDonorDetail, setSelectedDonorDetail] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Diagnostic Lab Tests Catalog State
+  const [labTestsList, setLabTestsList] = useState([]);
+  const [showAddLabTestModal, setShowAddLabTestModal] = useState(false);
+  const [newLabTestForm, setNewLabTestForm] = useState({
+    name: '',
+    category: 'Pathology',
+    code: '',
+    description: '',
+    price: 450,
+    sampleType: 'Blood',
+    fastingRequired: false,
+    preparationInstructions: 'No special preparation needed.',
+    turnaroundHours: 24,
+    dailyCapacity: 40,
+    isHomeSampleAvailable: true,
+    recommendedForSymptoms: ''
+  });
+  const [savingLabTest, setSavingLabTest] = useState(false);
+
   // New Doctor Form Modal
   const [showDoctorModal, setShowDoctorModal] = useState(false);
   const [editingDoctor, setEditingDoctor] = useState(null);
@@ -100,18 +119,20 @@ export const AdminDashboard = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [analyticsRes, usersRes, bloodRes, donorsRes, feedbackRes] = await Promise.all([
+      const [analyticsRes, usersRes, bloodRes, donorsRes, feedbackRes, labTestsRes] = await Promise.all([
         adminService.getAnalytics(),
         adminService.getUsers(),
         bloodService.getInventory(),
         bloodService.getAllDonorsAdmin(),
-        feedbackService.getAllAdmin()
+        feedbackService.getAllAdmin(),
+        labService.getTests()
       ]);
       setAnalytics(analyticsRes.data);
       setUsersList(usersRes.data.users || []);
       setBloodInventory(bloodRes.data.inventory || []);
       setDonorsList(donorsRes.data.donors || []);
       setFeedbacksList(feedbackRes.data.feedbacks || []);
+      setLabTestsList(labTestsRes.data.tests || []);
     } catch (err) {
       console.error('Error fetching admin data:', err);
     } finally {
@@ -122,6 +143,35 @@ export const AdminDashboard = () => {
   useEffect(() => {
     fetchData();
   }, []);
+
+  const handleSaveLabTest = async (e) => {
+    e.preventDefault();
+    try {
+      setSavingLabTest(true);
+      await labService.createTest(newLabTestForm);
+      alert(`Diagnostic test "${newLabTestForm.name}" (${newLabTestForm.code.toUpperCase()}) added to hospital catalog!`);
+      setShowAddLabTestModal(false);
+      setNewLabTestForm({
+        name: '',
+        category: 'Pathology',
+        code: '',
+        description: '',
+        price: 450,
+        sampleType: 'Blood',
+        fastingRequired: false,
+        preparationInstructions: 'No special preparation needed.',
+        turnaroundHours: 24,
+        dailyCapacity: 40,
+        isHomeSampleAvailable: true,
+        recommendedForSymptoms: ''
+      });
+      fetchData();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Error saving lab test');
+    } finally {
+      setSavingLabTest(false);
+    }
+  };
 
   const handleUpdateFeedbackStatus = async (id, status, adminReply) => {
     try {
@@ -339,6 +389,14 @@ export const AdminDashboard = () => {
             }`}
           >
             <MessageSquare className="w-3.5 h-3.5 text-amber-400" /> Patient Feedback ({feedbacksList.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('lab-tests')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+              activeTab === 'lab-tests' ? 'bg-purple-600 text-white shadow' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <FlaskConical className="w-3.5 h-3.5 text-emerald-400" /> Lab Catalog ({labTestsList.length})
           </button>
           <button
             onClick={() => setActiveTab('users')}
@@ -833,6 +891,132 @@ export const AdminDashboard = () => {
                 ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Diagnostic Lab Catalog Tab (Admin can add new lab tests based on requirement) */}
+      {activeTab === 'lab-tests' && (
+        <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+          <div className="flex flex-wrap justify-between items-center gap-4 border-b border-slate-100 pb-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <FlaskConical className="w-5 h-5 text-emerald-600" />
+                <h3 className="font-bold text-slate-900 text-lg">Hospital Diagnostic Laboratory Catalog</h3>
+              </div>
+              <p className="text-xs text-slate-500">
+                Manage medical laboratory investigations, configure turnaround times, sample requirements & provision new clinical tests
+              </p>
+            </div>
+
+            <button
+              onClick={() => setShowAddLabTestModal(true)}
+              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2 rounded-xl text-xs shadow-md transition"
+            >
+              <Plus className="w-4 h-4" />
+              <span>+ Add New Lab Test</span>
+            </button>
+          </div>
+
+          {/* Quick Metrics */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200">
+              <span className="text-[10px] uppercase font-bold text-emerald-800 tracking-wider">Total Active Tests</span>
+              <div className="text-2xl font-black text-emerald-950 mt-1">{labTestsList.length}</div>
+              <span className="text-[10px] text-emerald-600">Available in hospital lab</span>
+            </div>
+            <div className="p-4 rounded-2xl bg-sky-50/70 border border-sky-200">
+              <span className="text-[10px] uppercase font-bold text-sky-800 tracking-wider">Home Collection</span>
+              <div className="text-2xl font-black text-sky-950 mt-1">
+                {labTestsList.filter(t => t.isHomeSampleAvailable).length}
+              </div>
+              <span className="text-[10px] text-sky-600">Phlebotomy doorstep service</span>
+            </div>
+            <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200">
+              <span className="text-[10px] uppercase font-bold text-amber-800 tracking-wider">Fasting Tests</span>
+              <div className="text-2xl font-black text-amber-950 mt-1">
+                {labTestsList.filter(t => t.fastingRequired).length}
+              </div>
+              <span className="text-[10px] text-amber-600">Pre-test fasting protocol</span>
+            </div>
+            <div className="p-4 rounded-2xl bg-purple-50/70 border border-purple-200">
+              <span className="text-[10px] uppercase font-bold text-purple-800 tracking-wider">Categories</span>
+              <div className="text-2xl font-black text-purple-950 mt-1">5</div>
+              <span className="text-[10px] text-purple-600">Pathology, Radiology, Bio, etc.</span>
+            </div>
+          </div>
+
+          {/* Tests Table */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-left">
+              <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
+                <tr>
+                  <th className="p-3">Test Name & Code</th>
+                  <th className="p-3">Category</th>
+                  <th className="p-3">Sample Type</th>
+                  <th className="p-3">Fasting</th>
+                  <th className="p-3">Turnaround</th>
+                  <th className="p-3">Daily Capacity</th>
+                  <th className="p-3">Home Sample</th>
+                  <th className="p-3 text-right">Price</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {labTestsList.map((test) => (
+                  <tr key={test._id} className="hover:bg-slate-50 transition-colors">
+                    <td className="p-3 font-bold text-slate-900">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-[10px]">
+                          <FlaskConical className="w-3.5 h-3.5" />
+                        </div>
+                        <div>
+                          <div>{test.name}</div>
+                          <span className="text-[10px] font-mono text-slate-400">{test.code}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="p-3">
+                      <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-semibold text-[10px]">
+                        {test.category}
+                      </span>
+                    </td>
+                    <td className="p-3 text-slate-600">{test.sampleType || 'Blood'}</td>
+                    <td className="p-3">
+                      {test.fastingRequired ? (
+                        <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded text-[10px] font-bold">
+                          Required
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 text-[10px]">No</span>
+                      )}
+                    </td>
+                    <td className="p-3 text-slate-700 font-medium">
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-slate-400" />
+                        {test.turnaroundHours || 24} hrs
+                      </span>
+                    </td>
+                    <td className="p-3 text-slate-600 font-mono font-semibold">
+                      {test.dailyCapacity || 30} slots/day
+                    </td>
+                    <td className="p-3">
+                      {test.isHomeSampleAvailable ? (
+                        <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded text-[10px] font-bold">
+                          Available
+                        </span>
+                      ) : (
+                        <span className="bg-slate-100 text-slate-500 px-2 py-0.5 rounded text-[10px]">
+                          In-Lab Only
+                        </span>
+                      )}
+                    </td>
+                    <td className="p-3 text-right font-black text-slate-900 text-sm">
+                      ₹{test.price}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -1336,6 +1520,200 @@ export const AdminDashboard = () => {
                   className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold shadow-md transition"
                 >
                   {editingDoctor ? 'Save Changes' : 'Save & Provision Doctor'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add New Lab Test Modal */}
+      {showAddLabTestModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full p-6 sm:p-8 border border-slate-200 space-y-5 my-8 animate-in zoom-in-95">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <FlaskConical className="w-5 h-5 text-emerald-600" />
+                <h3 className="font-bold text-lg text-slate-900">Add New Diagnostic Lab Test</h3>
+              </div>
+              <button
+                onClick={() => setShowAddLabTestModal(false)}
+                className="text-slate-400 hover:text-slate-600 font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveLabTest} className="space-y-4 text-xs">
+              {/* Name & Code */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-2">
+                  <label className="block font-bold text-slate-700 mb-1">Test Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={newLabTestForm.name}
+                    onChange={(e) => setNewLabTestForm({ ...newLabTestForm, name: e.target.value })}
+                    placeholder="e.g. Thyroid Profile Total (T3, T4, TSH)"
+                    className="w-full p-2.5 bg-slate-50 border rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Unique Test Code *</label>
+                  <input
+                    type="text"
+                    required
+                    value={newLabTestForm.code}
+                    onChange={(e) => setNewLabTestForm({ ...newLabTestForm, code: e.target.value })}
+                    placeholder="e.g. THY-01"
+                    className="w-full p-2.5 bg-slate-50 border rounded-xl uppercase font-mono font-bold outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+              </div>
+
+              {/* Category, Sample Type & Price */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Category / Discipline *</label>
+                  <select
+                    value={newLabTestForm.category}
+                    onChange={(e) => setNewLabTestForm({ ...newLabTestForm, category: e.target.value })}
+                    className="w-full p-2.5 bg-slate-50 border rounded-xl font-semibold outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500"
+                  >
+                    <option value="Pathology">Pathology</option>
+                    <option value="Biochemistry">Biochemistry</option>
+                    <option value="Radiology">Radiology / Imaging</option>
+                    <option value="Cardiology">Cardiology</option>
+                    <option value="Microbiology">Microbiology</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Sample Type *</label>
+                  <select
+                    value={newLabTestForm.sampleType}
+                    onChange={(e) => setNewLabTestForm({ ...newLabTestForm, sampleType: e.target.value })}
+                    className="w-full p-2.5 bg-slate-50 border rounded-xl font-semibold outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500"
+                  >
+                    <option value="Blood">Blood (Serum / Plasma)</option>
+                    <option value="Urine">Urine</option>
+                    <option value="Saliva / Swab">Saliva / Swab</option>
+                    <option value="Imaging Scan">Imaging Scan (X-Ray / MRI / USG)</option>
+                    <option value="Tissue / Biopsy">Tissue / Biopsy</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Test Price (₹) *</label>
+                  <input
+                    type="number"
+                    min={50}
+                    step={10}
+                    required
+                    value={newLabTestForm.price}
+                    onChange={(e) => setNewLabTestForm({ ...newLabTestForm, price: Number(e.target.value) })}
+                    className="w-full p-2.5 bg-slate-50 border rounded-xl font-bold outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+              </div>
+
+              {/* Turnaround, Daily Capacity, Toggles */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Turnaround (Hours)</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={newLabTestForm.turnaroundHours}
+                    onChange={(e) => setNewLabTestForm({ ...newLabTestForm, turnaroundHours: Number(e.target.value) })}
+                    className="w-full p-2.5 bg-slate-50 border rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Daily Slot Capacity</label>
+                  <input
+                    type="number"
+                    min={5}
+                    value={newLabTestForm.dailyCapacity}
+                    onChange={(e) => setNewLabTestForm({ ...newLabTestForm, dailyCapacity: Number(e.target.value) })}
+                    className="w-full p-2.5 bg-slate-50 border rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+                <div className="flex flex-col justify-center">
+                  <label className="block font-bold text-slate-700 mb-1">Fasting Required?</label>
+                  <label className="flex items-center gap-2 cursor-pointer mt-1 font-semibold text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={newLabTestForm.fastingRequired}
+                      onChange={(e) => setNewLabTestForm({ ...newLabTestForm, fastingRequired: e.target.checked })}
+                      className="rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4"
+                    />
+                    <span>Yes, Fasting</span>
+                  </label>
+                </div>
+                <div className="flex flex-col justify-center">
+                  <label className="block font-bold text-slate-700 mb-1">Home Collection?</label>
+                  <label className="flex items-center gap-2 cursor-pointer mt-1 font-semibold text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={newLabTestForm.isHomeSampleAvailable}
+                      onChange={(e) => setNewLabTestForm({ ...newLabTestForm, isHomeSampleAvailable: e.target.checked })}
+                      className="rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4"
+                    />
+                    <span>Available</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Preparation Instructions */}
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Preparation Instructions for Patient</label>
+                <input
+                  type="text"
+                  value={newLabTestForm.preparationInstructions}
+                  onChange={(e) => setNewLabTestForm({ ...newLabTestForm, preparationInstructions: e.target.value })}
+                  placeholder="e.g. 10-12 hours overnight fasting required. Water intake allowed."
+                  className="w-full p-2.5 bg-slate-50 border rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              {/* Symptom Keywords for AI Matching */}
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Recommended for Symptoms (Comma Separated)</label>
+                <input
+                  type="text"
+                  value={newLabTestForm.recommendedForSymptoms}
+                  onChange={(e) => setNewLabTestForm({ ...newLabTestForm, recommendedForSymptoms: e.target.value })}
+                  placeholder="e.g. fatigue, hair loss, weight change, thyroid, weakness"
+                  className="w-full p-2.5 bg-slate-50 border rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Clinical Description & Scope</label>
+                <textarea
+                  rows={2}
+                  value={newLabTestForm.description}
+                  onChange={(e) => setNewLabTestForm({ ...newLabTestForm, description: e.target.value })}
+                  placeholder="Clinical purpose of test, diagnostic markers evaluated..."
+                  className="w-full p-2.5 bg-slate-50 border rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowAddLabTestModal(false)}
+                  className="px-4 py-2 rounded-xl text-slate-500 hover:bg-slate-100 font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingLabTest}
+                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold shadow-md transition flex items-center gap-1.5"
+                >
+                  <FlaskConical className="w-4 h-4" />
+                  <span>{savingLabTest ? 'Adding to Catalog...' : 'Save & Publish Lab Test'}</span>
                 </button>
               </div>
             </form>

@@ -79,6 +79,7 @@ export const bloodService = {
 // Lab Services
 export const labService = {
   getTests: (params) => api.get('/lab/tests', { params }),
+  createTest: (data) => api.post('/lab/tests', data),
   bookTest: (data) => api.post('/lab/book', data),
   getBookings: (params) => api.get('/lab/bookings', { params }),
   updateStatus: (id, data) => api.put(`/lab/bookings/${id}/status`, data),
@@ -90,7 +91,9 @@ export const doctorService = {
   getDashboard: () => api.get('/doctor/dashboard'),
   updateAvailability: (data) => api.put('/doctor/availability', typeof data === 'string' ? { availabilityStatus: data } : data),
   getPatientHistory: (patientId) => api.get(`/doctor/patient-history/${patientId}`),
-  requestEmergencyBlood: (data) => api.post('/doctor/emergency-blood-request', data)
+  requestEmergencyBlood: (data) => api.post('/doctor/emergency-blood-request', data),
+  createReferral: (data) => api.post('/doctor/referral', data),
+  updatePatientAlerts: (patientId, data) => api.put(`/doctor/patient-alerts/${patientId}`, data)
 };
 
 // Admin Services

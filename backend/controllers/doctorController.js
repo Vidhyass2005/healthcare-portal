@@ -15,11 +15,22 @@ exports.getDoctorDashboardSummary = async (req, res, next) => {
     const todayAppointments = await Appointment.find({
       doctor: doctorId,
       appointmentDate: today
-    }).sort({
+    })
+    .populate('patient', 'allergies medicalAlerts latestVitals')
+    .sort({
       isEmergency: -1,
       priorityScore: -1,
       createdAt: 1
     });
+
+    // Incoming inter-department referrals for this doctor
+    const referredQueue = await Appointment.find({
+      doctor: doctorId,
+      isReferralPatient: true,
+      status: { $in: ['Confirmed', 'In Progress', 'Pending'] }
+    })
+    .populate('patient', 'allergies medicalAlerts latestVitals')
+    .sort({ isEmergency: -1, priorityScore: -1, createdAt: -1 });
 
     const totalToday = todayAppointments.length;
     const completedCount = todayAppointments.filter(a => a.status === 'Completed').length;
@@ -37,10 +48,12 @@ exports.getDoctorDashboardSummary = async (req, res, next) => {
         completedCount,
         highPriorityCount,
         pendingCount: pendingQueue.length,
+        incomingReferralsCount: referredQueue.length,
         currentInConsultation: inProgressAppt || null,
         availabilityStatus: doctorUser.doctorProfile?.availabilityStatus || 'Available'
       },
-      todayQueue: todayAppointments
+      todayQueue: todayAppointments,
+      referredQueue
     });
   } catch (error) {
     next(error);
@@ -190,6 +203,148 @@ exports.requestEmergencyBlood = async (req, res, next) => {
       success: true,
       message: `Critical blood broadcast dispatched for ${unitsRequired} units of ${bloodGroup}!`,
       bloodRequest
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc Create Cross-Department Internal Referral
+// @route POST /api/doctor/referral
+exports.createCrossDepartmentReferral = async (req, res, next) => {
+  try {
+    const {
+      appointmentId,
+      referredToDepartment,
+      referredToDoctorId,
+      referralReason,
+      referralUrgency
+    } = req.body;
+
+    const sourceAppt = await Appointment.findById(appointmentId);
+    if (!sourceAppt) {
+      return res.status(404).json({ success: false, message: 'Source appointment not found' });
+    }
+
+    const targetDoctor = await User.findById(referredToDoctorId);
+    if (!targetDoctor || targetDoctor.role !== 'doctor') {
+      return res.status(404).json({ success: false, message: 'Target specialist doctor not found' });
+    }
+
+    const referringDoctor = await User.findById(req.user.id);
+    const referringDoctorName = referringDoctor?.name || req.user.name;
+    const referringDepartment = referringDoctor?.doctorProfile?.department || sourceAppt.department;
+
+    // Update source appointment with referral info
+    sourceAppt.referral = {
+      isReferred: true,
+      referredToDepartment: referredToDepartment || targetDoctor.doctorProfile?.department,
+      referredToDoctor: targetDoctor._id,
+      referredToDoctorName: targetDoctor.name,
+      referralReason: referralReason || 'Specialist clinical assessment required',
+      referralUrgency: referralUrgency || 'Routine',
+      referralDate: new Date(),
+      referralStatus: 'Pending Evaluation'
+    };
+    await sourceAppt.save();
+
+    // Create incoming referral appointment for target doctor
+    const today = new Date().toISOString().split('T')[0];
+    const referralAppt = await Appointment.create({
+      patient: sourceAppt.patient,
+      patientName: sourceAppt.patientName,
+      patientAge: sourceAppt.patientAge,
+      patientGender: sourceAppt.patientGender,
+      patientPhone: sourceAppt.patientPhone,
+      doctor: targetDoctor._id,
+      doctorName: targetDoctor.name,
+      department: referredToDepartment || targetDoctor.doctorProfile?.department,
+      appointmentDate: today,
+      slotTime: referralUrgency === 'Immediate STAT' ? 'IMMEDIATE' : 'OPD Referral',
+      symptoms: `[Cross-Dept Referral from ${referringDoctorName} (${referringDepartment})]: ${referralReason || sourceAppt.symptoms}`,
+      severity: referralUrgency === 'Immediate STAT' ? 'Severe' : referralUrgency === 'Urgent' ? 'Moderate' : 'Mild',
+      isEmergency: referralUrgency === 'Immediate STAT',
+      priorityScore: referralUrgency === 'Immediate STAT' ? 95 : referralUrgency === 'Urgent' ? 70 : 40,
+      priorityLevel: referralUrgency === 'Immediate STAT' ? 'High' : referralUrgency === 'Urgent' ? 'Moderate' : 'Low',
+      status: 'Confirmed',
+      vitals: sourceAppt.vitals || {},
+      allergies: sourceAppt.allergies || [],
+      medicalAlerts: sourceAppt.medicalAlerts || [],
+      // Referral metadata
+      isReferralPatient: true,
+      referredByDoctorName: referringDoctorName,
+      referredByDepartment: referringDepartment,
+      referralReason: referralReason || 'Clinical referral'
+    });
+
+    // Notify target doctor & patient
+    const Notification = require('../models/Notification');
+    const { emitAppointmentUpdate } = require('../services/socketService');
+
+    await Notification.create({
+      recipient: targetDoctor._id,
+      recipientRole: 'doctor',
+      type: 'REFERRAL',
+      title: `Inter-Department Referral: ${sourceAppt.patientName} (${referralUrgency || 'Routine'})`,
+      message: `${referringDoctorName} (${referringDepartment}) has referred patient ${sourceAppt.patientName} to your clinic. Reason: ${referralReason}`,
+      appointmentId: referralAppt._id
+    });
+
+    await Notification.create({
+      recipient: sourceAppt.patient,
+      recipientRole: 'patient',
+      type: 'REFERRAL',
+      title: `Cross-Department Referral to Dr. ${targetDoctor.name}`,
+      message: `You have been referred to ${targetDoctor.name} (${referredToDepartment}) by ${referringDoctorName}. Evaluation queue initialized.`,
+      appointmentId: referralAppt._id
+    });
+
+    emitAppointmentUpdate(targetDoctor._id, referralAppt);
+    emitAppointmentUpdate(sourceAppt.patient, referralAppt);
+
+    res.status(201).json({
+      success: true,
+      message: `Patient successfully referred to Dr. ${targetDoctor.name} (${referredToDepartment}) with ${referralUrgency} priority.`,
+      referralAppt
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc Update Patient Allergies, Medical Alerts, and Critical Flags
+// @route PUT /api/doctor/patient-alerts/:patientId
+exports.updatePatientAlerts = async (req, res, next) => {
+  try {
+    const { patientId } = req.params;
+    const { allergies, medicalAlerts, appointmentId } = req.body;
+
+    const patient = await User.findById(patientId);
+    if (!patient) {
+      return res.status(404).json({ success: false, message: 'Patient not found' });
+    }
+
+    if (allergies !== undefined) {
+      patient.allergies = Array.isArray(allergies) ? allergies : allergies.split(',').map(s => s.trim()).filter(Boolean);
+    }
+    if (medicalAlerts !== undefined) {
+      patient.medicalAlerts = Array.isArray(medicalAlerts) ? medicalAlerts : medicalAlerts.split(',').map(s => s.trim()).filter(Boolean);
+    }
+    await patient.save();
+
+    // If active appointmentId is provided, also sync to the appointment
+    if (appointmentId) {
+      await Appointment.findByIdAndUpdate(appointmentId, {
+        allergies: patient.allergies,
+        medicalAlerts: patient.medicalAlerts
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Patient clinical alerts and drug allergies updated successfully.',
+      allergies: patient.allergies,
+      medicalAlerts: patient.medicalAlerts
     });
   } catch (error) {
     next(error);

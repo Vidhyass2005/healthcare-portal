@@ -51,6 +51,14 @@ exports.getLabTests = async (req, res, next) => {
 // @route POST /api/lab/book
 exports.bookLabTest = async (req, res, next) => {
   try {
+    // Restrict booking: Doctors and Administrators cannot book lab tests
+    if (req.user.role === 'admin' || req.user.role === 'doctor') {
+      return res.status(403).json({
+        success: false,
+        message: 'Lab test booking is reserved for patients only. Doctors and administrators cannot book diagnostic slots.'
+      });
+    }
+
     const {
       labTestId,
       bookingDate,
@@ -232,6 +240,72 @@ exports.recommendTests = async (req, res, next) => {
       symptoms,
       count: recommendedTests.length,
       recommendedTests
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc Create a new diagnostic lab test in catalog
+// @route POST /api/lab/tests
+exports.createLabTest = async (req, res, next) => {
+  try {
+    const {
+      name,
+      category,
+      code,
+      description,
+      price,
+      sampleType,
+      fastingRequired,
+      preparationInstructions,
+      turnaroundHours,
+      dailyCapacity,
+      isHomeSampleAvailable,
+      recommendedForSymptoms
+    } = req.body;
+
+    if (!name || !code || !price) {
+      return res.status(400).json({
+        success: false,
+        message: 'Test name, unique code, and price are required.'
+      });
+    }
+
+    const cleanCode = code.trim().toUpperCase();
+    const existingTest = await LabTest.findOne({ code: cleanCode });
+    if (existingTest) {
+      return res.status(400).json({
+        success: false,
+        message: `A lab test with code ${cleanCode} already exists.`
+      });
+    }
+
+    const symptomsArray = Array.isArray(recommendedForSymptoms)
+      ? recommendedForSymptoms
+      : typeof recommendedForSymptoms === 'string'
+      ? recommendedForSymptoms.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
+      : [];
+
+    const newTest = await LabTest.create({
+      name: name.trim(),
+      category: category || 'Pathology',
+      code: cleanCode,
+      description: description ? description.trim() : '',
+      price: Number(price),
+      sampleType: sampleType || 'Blood',
+      fastingRequired: Boolean(fastingRequired),
+      preparationInstructions: preparationInstructions || 'No special preparation needed.',
+      turnaroundHours: Number(turnaroundHours) || 24,
+      dailyCapacity: Number(dailyCapacity) || 30,
+      isHomeSampleAvailable: isHomeSampleAvailable !== undefined ? Boolean(isHomeSampleAvailable) : true,
+      recommendedForSymptoms: symptomsArray
+    });
+
+    res.status(201).json({
+      success: true,
+      message: `Diagnostic investigation "${newTest.name}" (${newTest.code}) added to catalog successfully.`,
+      test: newTest
     });
   } catch (error) {
     next(error);

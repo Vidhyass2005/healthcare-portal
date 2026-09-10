@@ -28,7 +28,10 @@ import {
   Check,
   ThumbsUp,
   Sparkles,
-  X
+  X,
+  ShieldAlert,
+  Scale,
+  ArrowRightLeft
 } from 'lucide-react';
 
 export const PatientDashboard = ({ onNavigate }) => {
@@ -504,17 +507,84 @@ export const PatientDashboard = ({ onNavigate }) => {
               </div>
             </div>
 
-            {/* Chronic Conditions & Allergies Note */}
-            <div className="bg-amber-50/70 border border-amber-200 rounded-2xl p-4 text-xs space-y-1">
-              <div className="flex items-center gap-1.5 font-bold text-amber-900">
-                <AlertTriangle className="w-4 h-4 text-amber-600" />
-                <span>Recorded Chronic Profile & Patient Vitals:</span>
+            {/* Chronic Conditions, Allergies & Latest Vitals Banner */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-amber-50/70 border border-amber-200 rounded-2xl p-4 text-xs space-y-2">
+                <div className="flex items-center gap-1.5 font-bold text-amber-900">
+                  <AlertTriangle className="w-4 h-4 text-amber-600" />
+                  <span>Chronic Profile & Clinical Alerts:</span>
+                </div>
+                <p className="text-amber-800">
+                  {user?.hasChronicCondition
+                    ? `Active chronic condition(s): ${user.chronicDiseases?.join(', ') || 'Hypertension / Diabetes'}.`
+                    : 'No chronic conditions reported on file.'}
+                </p>
+
+                {/* Allergies and Medical Alerts Pills */}
+                {((user?.allergies && user.allergies.length > 0) || (user?.medicalAlerts && user.medicalAlerts.length > 0)) && (
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {(user.allergies || []).map((al, idx) => (
+                      <span key={`a-${idx}`} className="inline-flex items-center gap-1 bg-rose-100 text-rose-800 border border-rose-300 px-2 py-0.5 rounded text-[10px] font-bold">
+                        <ShieldAlert className="w-2.5 h-2.5 text-rose-600" />
+                        Allergy: {al}
+                      </span>
+                    ))}
+                    {(user.medicalAlerts || []).map((alt, idx) => (
+                      <span key={`m-${idx}`} className="inline-flex items-center gap-1 bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded text-[10px] font-bold">
+                        <AlertTriangle className="w-2.5 h-2.5 text-amber-600" />
+                        {alt}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
-              <p className="text-amber-800">
-                {user?.hasChronicCondition
-                  ? `Active chronic condition(s): ${user.chronicDiseases?.join(', ') || 'Hypertension / Diabetes'}.`
-                  : 'No chronic conditions reported on file.'}
-              </p>
+
+              {/* Latest Recorded Vitals Card */}
+              <div className="bg-sky-50/70 border border-sky-200 rounded-2xl p-4 text-xs space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 font-bold text-sky-950">
+                    <Activity className="w-4 h-4 text-sky-600" />
+                    <span>Latest Clinical Vitals:</span>
+                  </div>
+                  {user?.latestVitals?.bmi && (
+                    <span className="text-[10px] bg-sky-600 text-white font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <Scale className="w-3 h-3" />
+                      BMI: {user.latestVitals.bmi} ({user.latestVitals.bmiCategory || 'Normal'})
+                    </span>
+                  )}
+                </div>
+
+                {user?.latestVitals ? (
+                  <div className="grid grid-cols-3 gap-2 text-[11px] pt-1">
+                    <div className="bg-white p-2 rounded-xl border border-sky-100">
+                      <span className="text-slate-400 block text-[10px]">Blood Pressure</span>
+                      <strong className="text-slate-900">{user.latestVitals.bloodPressureSystolic || '-'}/{user.latestVitals.bloodPressureDiastolic || '-'} mmHg</strong>
+                    </div>
+                    <div className="bg-white p-2 rounded-xl border border-sky-100">
+                      <span className="text-slate-400 block text-[10px]">Heart Rate</span>
+                      <strong className="text-slate-900">{user.latestVitals.pulseHeartRate || '-'} BPM</strong>
+                    </div>
+                    <div className="bg-white p-2 rounded-xl border border-sky-100">
+                      <span className="text-slate-400 block text-[10px]">SpO₂ Oxygen</span>
+                      <strong className="text-slate-900">{user.latestVitals.oxygenSaturation || '-'}%</strong>
+                    </div>
+                    <div className="bg-white p-2 rounded-xl border border-sky-100">
+                      <span className="text-slate-400 block text-[10px]">Temperature</span>
+                      <strong className="text-slate-900">{user.latestVitals.temperature || '-'}°F</strong>
+                    </div>
+                    <div className="bg-white p-2 rounded-xl border border-sky-100">
+                      <span className="text-slate-400 block text-[10px]">Height / Weight</span>
+                      <strong className="text-slate-900">{user.latestVitals.heightCm || '-'}cm / {user.latestVitals.weightKg || '-'}kg</strong>
+                    </div>
+                    <div className="bg-white p-2 rounded-xl border border-sky-100">
+                      <span className="text-slate-400 block text-[10px]">Blood Sugar</span>
+                      <strong className="text-slate-900">{user.latestVitals.bloodSugarMgDl || '-'} mg/dL</strong>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sky-700 italic pt-2">Vitals will appear here after your first consultation.</p>
+                )}
+              </div>
             </div>
 
             {/* Past Consultations, Clinical Notes & Prescriptions */}
@@ -541,6 +611,12 @@ export const PatientDashboard = ({ onNavigate }) => {
                               <span className="bg-sky-100 text-sky-800 text-[10px] font-bold px-2 py-0.5 rounded">
                                 {a.department}
                               </span>
+                              {a.referral?.isReferred && (
+                                <span className="bg-indigo-100 text-indigo-800 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                                  <ArrowRightLeft className="w-3 h-3" />
+                                  Referred to {a.referral.referredToDoctorName || a.referral.referredToDepartment}
+                                </span>
+                              )}
                             </div>
                             <span className="text-[11px] text-slate-500">
                               Consultation Date: {a.appointmentDate} at {a.slotTime}
@@ -550,6 +626,32 @@ export const PatientDashboard = ({ onNavigate }) => {
                             Completed Consultation
                           </span>
                         </div>
+
+                        {/* Consultation Vitals Card */}
+                        {a.vitals && (a.vitals.bloodPressureSystolic || a.vitals.pulseHeartRate) && (
+                          <div className="bg-sky-50 border border-sky-100 p-2.5 rounded-xl text-xs flex flex-wrap items-center gap-3 text-sky-950 font-medium">
+                            <span className="font-bold text-[10px] uppercase text-sky-700">Recorded Vitals:</span>
+                            <span>BP: {a.vitals.bloodPressureSystolic}/{a.vitals.bloodPressureDiastolic} mmHg</span>
+                            <span>Pulse: {a.vitals.pulseHeartRate} BPM</span>
+                            <span>SpO₂: {a.vitals.oxygenSaturation}%</span>
+                            <span>Temp: {a.vitals.temperature}°F</span>
+                            {a.vitals.bmi && <span>BMI: {a.vitals.bmi} ({a.vitals.bmiCategory})</span>}
+                            {a.vitals.bloodSugarMgDl && <span>Sugar: {a.vitals.bloodSugarMgDl} mg/dL</span>}
+                          </div>
+                        )}
+
+                        {/* Cross-Department Referral Details */}
+                        {a.referral?.isReferred && (
+                          <div className="bg-indigo-50 border border-indigo-200 p-3 rounded-xl text-xs text-indigo-900 space-y-1">
+                            <div className="font-bold flex items-center gap-1.5">
+                              <ArrowRightLeft className="w-3.5 h-3.5 text-indigo-600" />
+                              <span>Inter-Specialist Referral Initiated ({a.referral.referralUrgency})</span>
+                            </div>
+                            <p>
+                              Dr. {a.doctorName} referred you to <strong>{a.referral.referredToDoctorName} ({a.referral.referredToDepartment})</strong>. Reason: {a.referral.referralReason}
+                            </p>
+                          </div>
+                        )}
 
                         {a.symptoms && (
                           <div className="text-xs text-slate-600">
