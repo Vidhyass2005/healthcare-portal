@@ -106,6 +106,14 @@ export const DoctorDashboard = () => {
   });
   const [submittingLeave, setSubmittingLeave] = useState(false);
 
+  // Follow-Up Visit Scheduling State
+  const [followUpForm, setFollowUpForm] = useState({
+    isFollowUpRequired: false,
+    followUpDate: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
+    followUpSlot: '10:00 AM',
+    followUpInstructions: '7-day clinical review and response to medication'
+  });
+
   // Computed Live BMI
   const computeBmi = () => {
     const h = parseFloat(vitalsForm.heightCm);
@@ -228,6 +236,13 @@ export const DoctorDashboard = () => {
     setPatientMedicalAlerts(appt.medicalAlerts?.length ? appt.medicalAlerts : (appt.patient?.medicalAlerts || []));
     setNewAllergyInput('');
     setNewAlertInput('');
+    // Initialize follow-up scheduling
+    setFollowUpForm({
+      isFollowUpRequired: appt.followUp?.isFollowUpRequired || false,
+      followUpDate: appt.followUp?.followUpDate || new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
+      followUpSlot: appt.followUp?.followUpSlot || '10:00 AM',
+      followUpInstructions: appt.followUp?.followUpInstructions || '7-day clinical review and response to medication'
+    });
   };
 
   const handleAddAllergy = (allergy) => {
@@ -302,7 +317,8 @@ export const DoctorDashboard = () => {
         recommendedLabTests: labTestsArray,
         vitals: cleanedVitals,
         allergies: patientAllergies,
-        medicalAlerts: patientMedicalAlerts
+        medicalAlerts: patientMedicalAlerts,
+        followUp: followUpForm
       });
 
       setActiveConsultationAppt(null);
@@ -424,8 +440,12 @@ export const DoctorDashboard = () => {
 
         {/* Doctor Status Picker */}
         <div className="bg-slate-950/80 p-3 rounded-2xl border border-slate-800 flex items-center gap-2">
-          <span className="text-xs text-slate-400 font-semibold px-2">Availability:</span>
-          {['Available', 'In Consultation', 'On Leave'].map((st) => (
+          <span className="text-xs text-slate-400 font-semibold px-2">{t('availabilityStatusLabel')}:</span>
+          {[
+            { key: 'Available', label: t('availableStatus') },
+            { key: 'In Consultation', label: t('inConsultationStatus') },
+            { key: 'On Leave', label: t('onLeaveStatus') }
+          ].map(({ key: st, label }) => (
             <button
               key={st}
               onClick={() => handleUpdateAvailability(st)}
@@ -439,7 +459,7 @@ export const DoctorDashboard = () => {
                   : 'bg-slate-800 text-slate-400 hover:text-white'
               }`}
             >
-              {st}
+              {label}
             </button>
           ))}
         </div>
@@ -454,7 +474,7 @@ export const DoctorDashboard = () => {
             </div>
             <div>
               <h4 className="font-bold text-amber-950 text-sm flex items-center gap-2">
-                <span>Doctor Currently On Leave</span>
+                <span>{t('onLeaveStatus')}</span>
                 <span className="bg-amber-200 text-amber-900 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase">
                   Bookings Paused
                 </span>
@@ -470,7 +490,7 @@ export const DoctorDashboard = () => {
             className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2 rounded-xl text-xs shadow transition flex items-center gap-1.5"
           >
             <CheckCircle className="w-4 h-4" />
-            <span>Resume Practice (Set Available)</span>
+            <span>{t('resumePractice')}</span>
           </button>
         </div>
       )}
@@ -479,47 +499,47 @@ export const DoctorDashboard = () => {
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
           <div className="flex items-center justify-between text-slate-500 text-xs">
-            <span className="font-semibold">Today's Queue</span>
+            <span className="font-semibold">{t('totalTodayQueue')}</span>
             <Users className="w-4 h-4 text-sky-600" />
           </div>
           <div className="text-3xl font-black text-slate-900 mt-2">{metrics.totalToday}</div>
-          <span className="text-[10px] text-slate-400 font-medium">Scheduled OPD Patients</span>
+          <span className="text-[10px] text-slate-400 font-medium">{t('scheduledPatients')}</span>
         </div>
 
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
           <div className="flex items-center justify-between text-rose-600 text-xs">
-            <span className="font-bold">High Priority</span>
+            <span className="font-bold">{t('highPriorityAlerts')}</span>
             <Flame className="w-4 h-4 text-rose-600 animate-pulse" />
           </div>
           <div className="text-3xl font-black text-rose-600 mt-2">{metrics.highPriorityCount}</div>
-          <span className="text-[10px] text-rose-500 font-medium">Urgent triage cases</span>
+          <span className="text-[10px] text-rose-500 font-medium">{t('urgentTriageCases')}</span>
         </div>
 
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
           <div className="flex items-center justify-between text-indigo-600 text-xs">
-            <span className="font-bold">Incoming Referrals</span>
+            <span className="font-bold">{t('incomingReferrals')}</span>
             <ArrowRightLeft className="w-4 h-4 text-indigo-600" />
           </div>
           <div className="text-3xl font-black text-indigo-700 mt-2">{referredQueue.length}</div>
-          <span className="text-[10px] text-indigo-600 font-medium">Specialist referrals</span>
+          <span className="text-[10px] text-indigo-600 font-medium">{t('specialistReferrals')}</span>
         </div>
 
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
           <div className="flex items-center justify-between text-emerald-600 text-xs">
-            <span className="font-semibold">Completed</span>
+            <span className="font-semibold">{t('completedConsultations')}</span>
             <CheckCircle className="w-4 h-4 text-emerald-600" />
           </div>
           <div className="text-3xl font-black text-emerald-700 mt-2">{metrics.completedCount}</div>
-          <span className="text-[10px] text-emerald-600 font-medium">Consultations finished</span>
+          <span className="text-[10px] text-emerald-600 font-medium">{t('finishedEvaluations')}</span>
         </div>
 
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
           <div className="flex items-center justify-between text-slate-500 text-xs">
-            <span className="font-semibold">Pending Queue</span>
+            <span className="font-semibold">{t('pendingLounge')}</span>
             <Clock className="w-4 h-4 text-amber-500" />
           </div>
           <div className="text-3xl font-black text-slate-900 mt-2">{metrics.pendingCount}</div>
-          <span className="text-[10px] text-slate-400 font-medium">In waiting lounge</span>
+          <span className="text-[10px] text-slate-400 font-medium">{t('waitingLounge')}</span>
         </div>
       </div>
 
@@ -530,7 +550,7 @@ export const DoctorDashboard = () => {
             <div className="flex items-center gap-3">
               <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                 <Activity className="w-5 h-5 text-sky-600" />
-                <span>Patient Queue Management</span>
+                <span>{t('patientQueueManagement')}</span>
               </h2>
 
               {/* Queue Mode Tabs */}
@@ -544,7 +564,7 @@ export const DoctorDashboard = () => {
                       : 'text-slate-500 hover:text-slate-900'
                   }`}
                 >
-                  OPD Queue ({todayQueue.length})
+                  {t('opdQueueTab')} ({todayQueue.length})
                 </button>
                 <button
                   type="button"
@@ -556,7 +576,7 @@ export const DoctorDashboard = () => {
                   }`}
                 >
                   <ArrowRightLeft className="w-3.5 h-3.5" />
-                  <span>Incoming Referrals ({referredQueue.length})</span>
+                  <span>{t('referralsQueueTab')} ({referredQueue.length})</span>
                 </button>
               </div>
             </div>
@@ -573,7 +593,7 @@ export const DoctorDashboard = () => {
             className="flex items-center gap-2 bg-rose-600 hover:bg-rose-500 text-white font-bold px-4 py-2 rounded-xl text-xs shadow-md transition"
           >
             <Flame className="w-4 h-4" />
-            <span>Emergency Blood Broadcast</span>
+            <span>{t('emergencyBloodBroadcast')}</span>
           </button>
         </div>
 
@@ -588,14 +608,14 @@ export const DoctorDashboard = () => {
             <table className="w-full text-xs text-left">
               <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
                 <tr>
-                  <th className="p-3">Queue #</th>
-                  <th className="p-3">Patient Details</th>
-                  <th className="p-3">Slot / Urgency</th>
-                  <th className="p-3">Clinical Alerts & Allergies</th>
-                  <th className="p-3">Clinical Triage</th>
-                  <th className="p-3">Symptoms & Referral Note</th>
-                  <th className="p-3">Status</th>
-                  <th className="p-3 text-right">Doctor Actions</th>
+                  <th className="p-3">{t('colQueueNum')}</th>
+                  <th className="p-3">{t('colPatientDetails')}</th>
+                  <th className="p-3">{t('colSlotUrgency')}</th>
+                  <th className="p-3">{t('colClinicalAlerts')}</th>
+                  <th className="p-3">{t('colClinicalTriage')}</th>
+                  <th className="p-3">{t('colSymptomsReferral')}</th>
+                  <th className="p-3">{t('colStatus')}</th>
+                  <th className="p-3 text-right">{t('colDoctorActions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -622,12 +642,17 @@ export const DoctorDashboard = () => {
                         )}
                       </td>
                       <td className="p-3">
-                        <div className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+                        <div className="font-bold text-slate-900 text-sm flex items-center gap-1.5 flex-wrap">
                           <span>{appt.patientName}</span>
                           {appt.isEmergency && <Flame className="w-3.5 h-3.5 text-red-600 fill-red-600" />}
                           {appt.isReferralPatient && (
                             <span className="text-[10px] bg-indigo-600 text-white px-1.5 py-0.2 rounded font-bold">
                               Referred
+                            </span>
+                          )}
+                          {appt.followUp?.isFollowUpRequired && (
+                            <span className="text-[10px] bg-purple-100 text-purple-700 border border-purple-200 px-1.5 py-0.2 rounded font-bold">
+                              {t('followUpBadge')}
                             </span>
                           )}
                         </div>
@@ -699,6 +724,11 @@ export const DoctorDashboard = () => {
                             Referred to {appt.referral.referredToDoctorName || appt.referral.referredToDepartment}
                           </span>
                         )}
+                        {appt.followUp?.isFollowUpRequired && (
+                          <div className="mt-1 text-[10px] text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded font-medium">
+                            📅 {t('followUpBadge')}: {appt.followUp.followUpDate} ({appt.followUp.followUpSlot})
+                          </div>
+                        )}
                       </td>
                       <td className="p-3">
                         <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] uppercase ${
@@ -714,7 +744,7 @@ export const DoctorDashboard = () => {
                         <button
                           onClick={() => handleViewPatientHistory(appt.patient)}
                           className="p-1.5 text-slate-600 hover:text-sky-600 bg-slate-100 hover:bg-sky-50 rounded-lg transition"
-                          title="View Medical History & Past Lab Reports"
+                          title={t('patientHistoryTitle')}
                         >
                           <History className="w-4 h-4" />
                         </button>
@@ -735,7 +765,7 @@ export const DoctorDashboard = () => {
                               className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-2.5 py-1.5 rounded-lg text-xs transition inline-flex items-center gap-1"
                               title="Call Patient In"
                             >
-                              <Play className="w-3 h-3" /> Start
+                              <Play className="w-3 h-3" /> {t('btnStart')}
                             </button>
                             {!appt.isEmergency && (
                               <button
@@ -743,7 +773,7 @@ export const DoctorDashboard = () => {
                                 className="text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 border border-red-200 px-2 py-1.5 rounded-lg text-xs font-bold transition"
                                 title="Triage Emergency Override to front of queue"
                               >
-                                ⚡ Override
+                                ⚡ {t('btnOverride')}
                               </button>
                             )}
                           </>
@@ -754,7 +784,7 @@ export const DoctorDashboard = () => {
                             onClick={() => handleOpenConsultationModal(appt)}
                             className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3 py-1.5 rounded-lg text-xs shadow transition inline-flex items-center gap-1"
                           >
-                            <Check className="w-3.5 h-3.5" /> Complete & Prescribe
+                            <Check className="w-3.5 h-3.5" /> {t('btnComplete')}
                           </button>
                         )}
                       </td>
@@ -1111,19 +1141,81 @@ export const DoctorDashboard = () => {
                 />
               </div>
 
+              {/* Follow-Up Visit Scheduling Section */}
+              <div className="bg-emerald-50/70 border border-emerald-200 rounded-2xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-emerald-600" />
+                    <div>
+                      <h4 className="text-xs font-bold text-emerald-950">{t('followUpSection')}</h4>
+                      <span className="text-[10px] text-emerald-700">{t('followUpScheduledNotice')}</span>
+                    </div>
+                  </div>
+
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={followUpForm.isFollowUpRequired}
+                      onChange={(e) => setFollowUpForm({ ...followUpForm, isFollowUpRequired: e.target.checked })}
+                      className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500 border-slate-300"
+                    />
+                    <span className="text-xs font-bold text-emerald-900">{t('scheduleFollowUpToggle')}</span>
+                  </label>
+                </div>
+
+                {followUpForm.isFollowUpRequired && (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2 border-t border-emerald-200/60 text-xs animate-in slide-in-from-top-1">
+                    <div>
+                      <label className="block text-[10px] font-bold text-emerald-900 mb-1">{t('followUpDateLabel')} *</label>
+                      <input
+                        type="date"
+                        min={new Date(Date.now() + 86400000).toISOString().split('T')[0]}
+                        value={followUpForm.followUpDate}
+                        onChange={(e) => setFollowUpForm({ ...followUpForm, followUpDate: e.target.value })}
+                        className="w-full px-2.5 py-1.5 bg-white border border-emerald-200 rounded-lg text-xs font-semibold outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-emerald-900 mb-1">{t('followUpSlotLabel')} *</label>
+                      <select
+                        value={followUpForm.followUpSlot}
+                        onChange={(e) => setFollowUpForm({ ...followUpForm, followUpSlot: e.target.value })}
+                        className="w-full px-2.5 py-1.5 bg-white border border-emerald-200 rounded-lg text-xs font-semibold outline-none focus:ring-2 focus:ring-emerald-500"
+                      >
+                        {['09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM', '02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM', '04:00 PM'].map(s => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="sm:col-span-3">
+                      <label className="block text-[10px] font-bold text-emerald-900 mb-1">{t('followUpInstructionsLabel')}</label>
+                      <input
+                        type="text"
+                        value={followUpForm.followUpInstructions}
+                        onChange={(e) => setFollowUpForm({ ...followUpForm, followUpInstructions: e.target.value })}
+                        placeholder="e.g. Check blood pressure response after new antihypertensive, review CBC report..."
+                        className="w-full px-2.5 py-1.5 bg-white border border-emerald-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setActiveConsultationAppt(null)}
                   className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100"
                 >
-                  Cancel
+                  {t('cancelAction')}
                 </button>
                 <button
                   type="submit"
                   className="px-5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md transition"
                 >
-                  Save & Complete Consultation
+                  {t('completeAndPrescribe')}
                 </button>
               </div>
             </form>

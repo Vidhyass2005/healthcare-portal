@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { adminService, bloodService, feedbackService, labService } from '../services/api';
 import {
   Chart as ChartJS,
@@ -52,6 +53,7 @@ ChartJS.register(
 
 export const AdminDashboard = () => {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState('analytics'); // 'analytics' | 'inventory' | 'doctors' | 'users'
   const [analytics, setAnalytics] = useState(null);
   const [usersList, setUsersList] = useState([]);
@@ -338,13 +340,13 @@ export const AdminDashboard = () => {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-bold">Hospital Administration Portal</h1>
+              <h1 className="text-xl sm:text-2xl font-bold">{t('adminPortalTitle')}</h1>
               <span className="text-xs bg-purple-500/30 text-purple-200 px-2.5 py-0.5 rounded-full border border-purple-400/30 font-semibold uppercase">
-                Admin
+                {t('roleAdmin')}
               </span>
             </div>
             <p className="text-xs text-slate-300 mt-1">
-              Supervising Outpatient Flow, Blood Bank Stock & Real-time Clinical Priorities
+              {t('adminSubtitle')}
             </p>
           </div>
         </div>
@@ -356,7 +358,7 @@ export const AdminDashboard = () => {
               activeTab === 'analytics' ? 'bg-purple-600 text-white shadow' : 'text-slate-400 hover:text-white'
             }`}
           >
-            <BarChart3 className="w-3.5 h-3.5" /> Analytics
+            <BarChart3 className="w-3.5 h-3.5" /> {t('tabAnalytics')}
           </button>
           <button
             onClick={() => setActiveTab('doctors')}
@@ -364,7 +366,7 @@ export const AdminDashboard = () => {
               activeTab === 'doctors' ? 'bg-purple-600 text-white shadow' : 'text-slate-400 hover:text-white'
             }`}
           >
-            <Stethoscope className="w-3.5 h-3.5" /> Doctors Directory
+            <Stethoscope className="w-3.5 h-3.5" /> {t('tabDoctors')}
           </button>
           <button
             onClick={() => setActiveTab('inventory')}
@@ -372,7 +374,7 @@ export const AdminDashboard = () => {
               activeTab === 'inventory' ? 'bg-purple-600 text-white shadow' : 'text-slate-400 hover:text-white'
             }`}
           >
-            <Heart className="w-3.5 h-3.5" /> Blood Stock
+            <Heart className="w-3.5 h-3.5" /> {t('tabBloodStock')}
           </button>
           <button
             onClick={() => setActiveTab('donors')}
@@ -380,7 +382,7 @@ export const AdminDashboard = () => {
               activeTab === 'donors' ? 'bg-purple-600 text-white shadow' : 'text-slate-400 hover:text-white'
             }`}
           >
-            <Heart className="w-3.5 h-3.5 text-rose-400" /> Donors Directory ({donorsList.length})
+            <Heart className="w-3.5 h-3.5 text-rose-400" /> {t('tabDonors')} ({donorsList.length})
           </button>
           <button
             onClick={() => setActiveTab('feedback')}
@@ -388,7 +390,7 @@ export const AdminDashboard = () => {
               activeTab === 'feedback' ? 'bg-purple-600 text-white shadow' : 'text-slate-400 hover:text-white'
             }`}
           >
-            <MessageSquare className="w-3.5 h-3.5 text-amber-400" /> Patient Feedback ({feedbacksList.length})
+            <MessageSquare className="w-3.5 h-3.5 text-amber-400" /> {t('tabFeedback')} ({feedbacksList.length})
           </button>
           <button
             onClick={() => setActiveTab('lab-tests')}
@@ -396,7 +398,7 @@ export const AdminDashboard = () => {
               activeTab === 'lab-tests' ? 'bg-purple-600 text-white shadow' : 'text-slate-400 hover:text-white'
             }`}
           >
-            <FlaskConical className="w-3.5 h-3.5 text-emerald-400" /> Lab Catalog ({labTestsList.length})
+            <FlaskConical className="w-3.5 h-3.5 text-emerald-400" /> {t('tabLabCatalog')} ({labTestsList.length})
           </button>
           <button
             onClick={() => setActiveTab('users')}
@@ -404,7 +406,7 @@ export const AdminDashboard = () => {
               activeTab === 'users' ? 'bg-purple-600 text-white shadow' : 'text-slate-400 hover:text-white'
             }`}
           >
-            <Users className="w-3.5 h-3.5" /> All Users
+            <Users className="w-3.5 h-3.5" /> {t('tabUsers')}
           </button>
         </div>
       </div>
@@ -412,19 +414,19 @@ export const AdminDashboard = () => {
       {/* KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
-          <span className="text-[11px] text-slate-500 font-semibold block">Total Appointments</span>
+          <span className="text-[11px] text-slate-500 font-semibold block">{t('kpiTotalAppointments')}</span>
           <div className="text-2xl font-black text-slate-900 mt-1">{analytics?.metrics?.totalAppointments || 0}</div>
           <span className="text-[10px] text-emerald-600 font-bold">{analytics?.metrics?.completedAppointments || 0} completed</span>
         </div>
 
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
-          <span className="text-[11px] text-slate-500 font-semibold block">No-Show Rate</span>
+          <span className="text-[11px] text-slate-500 font-semibold block">{t('kpiNoShowRate')}</span>
           <div className="text-2xl font-black text-amber-600 mt-1">{analytics?.metrics?.noShowRate || '0%'}</div>
           <span className="text-[10px] text-slate-400">{analytics?.metrics?.noShowAppointments || 0} missed slots</span>
         </div>
 
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
-          <span className="text-[11px] text-slate-500 font-semibold block">High Priority Cases</span>
+          <span className="text-[11px] text-slate-500 font-semibold block">{t('highPriorityAlerts')}</span>
           <div className="text-2xl font-black text-red-600 mt-1">{analytics?.metrics?.highPriorityAppointments || 0}</div>
           <span className="text-[10px] text-red-500 font-bold">Fast-tracked OPD</span>
         </div>

@@ -341,7 +341,14 @@ export const PatientDashboard = ({ onNavigate }) => {
                     {appointments.map((appt) => (
                       <tr key={appt._id} className="hover:bg-slate-50">
                         <td className="p-3">
-                          <div className="font-bold text-slate-800">{appt.doctorName}</div>
+                          <div className="font-bold text-slate-800 flex items-center gap-1.5 flex-wrap">
+                            <span>{appt.doctorName}</span>
+                            {(appt.followUp?.isFollowUpRequired || appt.symptoms?.startsWith('[Follow-up Review]')) && (
+                              <span className="text-[10px] bg-purple-100 text-purple-800 border border-purple-200 px-1.5 py-0.2 rounded font-bold">
+                                {t('followUpBadge')}
+                              </span>
+                            )}
+                          </div>
                           <div className="text-[11px] text-slate-500">{appt.department}</div>
                         </td>
                         <td className="p-3">
@@ -663,6 +670,25 @@ export const PatientDashboard = ({ onNavigate }) => {
                           <div className="bg-white p-3 rounded-xl border border-slate-200 text-xs text-slate-700">
                             <strong className="text-slate-900 block mb-1">Doctor's Clinical Diagnosis & Advice:</strong>
                             <p>{a.clinicalNotes}</p>
+                          </div>
+                        )}
+
+                        {a.followUp?.isFollowUpRequired && (
+                          <div className="bg-purple-50 border border-purple-200 p-3 rounded-xl text-xs text-purple-950 space-y-1">
+                            <div className="font-bold flex items-center justify-between text-purple-900">
+                              <span className="flex items-center gap-1.5">
+                                <Calendar className="w-3.5 h-3.5 text-purple-600" />
+                                <span>{t('followUpSection')}: {a.followUp.followUpDate} ({a.followUp.followUpSlot})</span>
+                              </span>
+                              <span className="bg-purple-200 text-purple-900 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                {a.followUp.followUpStatus || 'Scheduled'}
+                              </span>
+                            </div>
+                            {a.followUp.followUpInstructions && (
+                              <p className="text-purple-800 text-[11px] mt-0.5">
+                                <strong>Instructions:</strong> {a.followUp.followUpInstructions}
+                              </p>
+                            )}
                           </div>
                         )}
 

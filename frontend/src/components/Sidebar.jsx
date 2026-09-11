@@ -33,18 +33,15 @@ export const Sidebar = ({ currentPath = '/', onNavigate, isOpen, onClose }) => {
 
     if (user.role === 'doctor') {
       return [
-        { path: '/doctor-dashboard', label: t('navDashboard'), icon: LayoutDashboard },
-        { path: '/doctor-dashboard?tab=queue', label: t('navDoctorQueue'), icon: Clock, badge: 'Live' },
-        { path: '/blood-bank', label: t('emergencyBloodAlert'), icon: Heart }
+        { path: '/doctor-dashboard', label: t('clinicalOverview'), icon: LayoutDashboard },
+        { path: '/blood-bank', label: t('emergencyBloodAlert'), icon: Heart, badge: 'Live' }
       ];
     }
 
     if (user.role === 'admin') {
       return [
-        { path: '/admin-dashboard', label: t('navDashboard'), icon: LayoutDashboard },
-        { path: '/admin-dashboard?tab=analytics', label: t('navAnalytics'), icon: BarChart3 },
-        { path: '/blood-bank', label: t('bloodInventory'), icon: Heart },
-        { path: '/admin-dashboard?tab=users', label: t('navManageUsers'), icon: Users }
+        { path: '/admin-dashboard', label: t('hospitalAnalyticsTab'), icon: LayoutDashboard },
+        { path: '/blood-bank', label: t('bloodInventory'), icon: Heart }
       ];
     }
 

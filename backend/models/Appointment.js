@@ -138,6 +138,15 @@ const appointmentSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  // Follow-Up Visit Scheduling
+  followUp: {
+    isFollowUpRequired: { type: Boolean, default: false },
+    followUpDate: { type: String, default: null }, // YYYY-MM-DD
+    followUpSlot: { type: String, default: '10:00 AM' },
+    followUpInstructions: { type: String, default: '' },
+    followUpStatus: { type: String, enum: ['Scheduled', 'Completed', 'Cancelled', 'None'], default: 'None' },
+    followUpAppointmentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Appointment', default: null }
+  },
   referredByDoctorName: {
     type: String,
     default: ''

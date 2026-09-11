@@ -431,6 +431,75 @@ exports.updateAppointmentStatus = async (req, res, next) => {
       await User.findByIdAndUpdate(appointment.patient, { medicalAlerts: cleanAlerts });
     }
 
+    // Follow-up visit scheduling
+    const { followUp } = req.body;
+    if (followUp && followUp.isFollowUpRequired && followUp.followUpDate) {
+      const followUpDate = followUp.followUpDate;
+      const followUpSlot = followUp.followUpSlot || '10:00 AM';
+      const followUpInstructions = followUp.followUpInstructions || 'Clinical follow-up consultation';
+
+      // Check if a follow-up appointment already exists or create new one
+      let followUpAppt = null;
+      try {
+        followUpAppt = await Appointment.create({
+          patient: appointment.patient,
+          patientName: appointment.patientName,
+          patientAge: appointment.patientAge,
+          patientGender: appointment.patientGender,
+          patientPhone: appointment.patientPhone,
+          doctor: appointment.doctor,
+          doctorName: appointment.doctorName,
+          department: appointment.department,
+          appointmentDate: followUpDate,
+          slotTime: followUpSlot,
+          symptoms: `[Follow-up Review]: ${followUpInstructions}`,
+          severity: 'Mild',
+          priorityScore: 50,
+          priorityLevel: 'Moderate',
+          hasChronicCondition: appointment.hasChronicCondition,
+          chronicDiseases: appointment.chronicDiseases,
+          status: 'Confirmed',
+          allergies: appointment.allergies || [],
+          medicalAlerts: appointment.medicalAlerts || [],
+          vitals: appointment.vitals || {}
+        });
+
+        appointment.followUp = {
+          isFollowUpRequired: true,
+          followUpDate,
+          followUpSlot,
+          followUpInstructions,
+          followUpStatus: 'Scheduled',
+          followUpAppointmentId: followUpAppt._id
+        };
+
+        // Reorder queue for the follow-up date
+        await reorderDoctorQueue(appointment.doctor, followUpDate);
+
+        // Notify patient
+        await Notification.create({
+          recipient: appointment.patient,
+          title: `Follow-Up Scheduled with Dr. ${appointment.doctorName}`,
+          message: `Dr. ${appointment.doctorName} has scheduled your clinical follow-up visit on ${followUpDate} at ${followUpSlot}. Instructions: ${followUpInstructions}`,
+          type: 'appointment_update',
+          priority: 'medium',
+          metadata: { appointmentId: followUpAppt._id.toString() }
+        });
+
+        emitAppointmentUpdate(appointment.patient, followUpAppt);
+      } catch (err) {
+        console.warn('Could not auto-book follow-up appointment:', err.message);
+        appointment.followUp = {
+          isFollowUpRequired: true,
+          followUpDate,
+          followUpSlot,
+          followUpInstructions,
+          followUpStatus: 'Scheduled',
+          followUpAppointmentId: null
+        };
+      }
+    }
+
     await appointment.save();
 
     // Reorder remaining active queue
