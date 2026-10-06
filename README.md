@@ -33,7 +33,6 @@ A full-stack, enterprise-grade healthcare management application featuring intel
 - **Patient Dashboard**: Live queue tracker, appointments history, diagnostic report viewer, blood requests
 - **Doctor Dashboard**: Priority-sorted patient queue, consultation status updater, digital prescription writer, emergency blood requisition, medical history inspection
 - **Admin Dashboard**: Chart.js analytics (Department Load, Peak Hours, Blood Inventory), user and doctor management, no-show detection
-- **Blood Donor Dashboard**: 90-day eligibility indicator, live emergency alerts stream with 1-click pledge, lifetime donation certificates
 
 ### 5. 🌐 Multi-Language Support
 - Full English and Tamil (`தமிழ்`) localization switcher across all UI modules.
