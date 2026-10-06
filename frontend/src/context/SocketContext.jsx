@@ -22,22 +22,13 @@ export const SocketProvider = ({ children }) => {
       console.log('Connected to real-time socket server:', newSocket.id);
     });
 
-    // Listen for global notifications and emergency broadcasts
+    // Listen for global and role-specific notifications
     newSocket.on('new_notification', (notification) => {
       setActiveAlerts(prev => [notification, ...prev]);
     });
 
-    newSocket.on('emergency_blood_broadcast', (request) => {
-      const alertItem = {
-        id: Date.now(),
-        title: `CRITICAL BLOOD ALERT: ${request.bloodGroup}`,
-        message: `${request.unitsRequired} units needed urgently at ${request.hospitalName}, ${request.city}!`,
-        type: 'emergency_blood',
-        priority: 'emergency',
-        data: request,
-        createdAt: new Date()
-      };
-      setActiveAlerts(prev => [alertItem, ...prev]);
+    newSocket.on('global_notification', (notification) => {
+      setActiveAlerts(prev => [notification, ...prev]);
     });
 
     newSocket.on('queue_updated', (data) => {
@@ -56,13 +47,13 @@ export const SocketProvider = ({ children }) => {
   // Join rooms when user changes
   useEffect(() => {
     if (socket && user) {
-      socket.emit('join_room', `user_${user.id || user._id}`);
+      const uid = user.id || user._id;
+      socket.emit('join_room', `user_${uid}`);
+      if (user.role) {
+        socket.emit('join_room', `role_${user.role}`);
+      }
       if (user.role === 'doctor') {
-        socket.emit('join_room', `doctor_${user.id || user._id}`);
-      } else if (user.role === 'donor') {
-        socket.emit('join_room', 'donors');
-      } else if (user.role === 'admin') {
-        socket.emit('join_room', 'admins');
+        socket.emit('join_room', `doctor_${uid}`);
       }
     }
   }, [socket, user]);

@@ -3,7 +3,7 @@ const User = require('../models/User');
 const Notification = require('../models/Notification');
 const { calculatePriorityScore, reorderDoctorQueue } = require('../services/priorityEngine');
 const { calculateNoShowRisk } = require('../services/noShowPredictor');
-const { emitQueueUpdate, emitAppointmentUpdate } = require('../services/socketService');
+const { emitQueueUpdate, emitAppointmentUpdate, emitNotification } = require('../services/socketService');
 
 // Time helpers to prevent past booking and enforce only future timings
 const getLocalDateString = (d = new Date()) => {
@@ -210,15 +210,58 @@ exports.bookAppointment = async (req, res, next) => {
       queue: updatedQueue
     });
 
-    // 6. Create Notification
-    await Notification.create({
+    // 6. Role-Specific In-App Notifications
+    // 6a. Patient Confirmation Notification
+    const patientNotif = await Notification.create({
       recipient: patientId,
+      recipientRole: 'patient',
       title: 'Appointment Confirmed',
-      message: `Your appointment with ${doctor.name} on ${appointmentDate} at ${slotTime} is confirmed. Priority: ${priorityLevel}.`,
+      message: `Your appointment with Dr. ${doctor.name} on ${appointmentDate} at ${slotTime} is confirmed. Priority: ${priorityLevel}.`,
       type: 'appointment_update',
       priority: priorityLevel === 'High' ? 'high' : 'medium',
       metadata: { appointmentId: appointment._id.toString() }
     });
+    emitNotification(patientId, 'patient', patientNotif);
+
+    // 6b. Doctor Schedule Notification
+    const doctorNotif = await Notification.create({
+      recipient: doctorId,
+      recipientRole: 'doctor',
+      title: 'New Patient Appointment',
+      message: `New consultation booked for ${appointment.patientName} on ${appointmentDate} at ${slotTime}. Priority: ${priorityLevel}.`,
+      type: 'queue_alert',
+      priority: priorityLevel === 'High' ? 'high' : 'medium',
+      metadata: { appointmentId: appointment._id.toString() }
+    });
+    emitNotification(doctorId, 'doctor', doctorNotif);
+
+    // 6c. Admin Assistance Notification (if Wheelchair or Observation Bed requested)
+    if (isWheelchair || isObsBed) {
+      const assistanceDetails = [isWheelchair ? 'Wheelchair' : null, isObsBed ? 'Observation Bed' : null].filter(Boolean).join(' & ');
+      const adminAssistanceNotif = await Notification.create({
+        recipientRole: 'admin',
+        title: 'Assistance Requested (OPD Bed/Wheelchair)',
+        message: `Patient ${appointment.patientName} requested ${assistanceDetails} for Dr. ${doctor.name} on ${appointmentDate} (${slotTime}).`,
+        type: 'facility_assistance',
+        priority: 'medium',
+        metadata: { appointmentId: appointment._id.toString() }
+      });
+      emitNotification(null, 'admin', adminAssistanceNotif);
+    }
+
+    // 6d. Emergency Alert for Doctor & Admin if marked as emergency
+    if (effectiveEmergency) {
+      const emergencyNotif = await Notification.create({
+        recipientRole: 'admin',
+        title: 'CRITICAL EMERGENCY CHECK-IN',
+        message: `Urgent emergency visit registered for ${appointment.patientName} with Dr. ${doctor.name} (${appointment.department}). Immediate attention required.`,
+        type: 'emergency_alert',
+        priority: 'high',
+        metadata: { appointmentId: appointment._id.toString() }
+      });
+      emitNotification(null, 'admin', emergencyNotif);
+      emitNotification(doctorId, 'doctor', emergencyNotif);
+    }
 
     res.status(201).json({
       success: true,
@@ -466,15 +509,27 @@ exports.cancelAppointment = async (req, res, next) => {
     const updatedQueue = await reorderDoctorQueue(appointment.doctor, appointment.appointmentDate);
 
     // Notify user & doctor
-    const Notification = require('../models/Notification');
-    await Notification.create({
+    const patientNotif = await Notification.create({
       recipient: appointment.patient,
+      recipientRole: 'patient',
       title: 'Appointment Cancelled',
       message: `Your appointment with Dr. ${appointment.doctorName} on ${appointment.appointmentDate} at ${appointment.slotTime} has been cancelled. Reason: ${reasonText}`,
       type: 'appointment_update',
       priority: 'medium',
       metadata: { appointmentId: appointment._id.toString() }
     });
+    emitNotification(appointment.patient, 'patient', patientNotif);
+
+    const docNotif = await Notification.create({
+      recipient: appointment.doctor,
+      recipientRole: 'doctor',
+      title: 'Appointment Cancelled',
+      message: `Appointment for ${appointment.patientName} on ${appointment.appointmentDate} at ${appointment.slotTime} has been cancelled (${reasonText}). Slot is now released.`,
+      type: 'appointment_update',
+      priority: 'medium',
+      metadata: { appointmentId: appointment._id.toString() }
+    });
+    emitNotification(appointment.doctor, 'doctor', docNotif);
 
     emitAppointmentUpdate(appointment.patient, appointment);
     emitQueueUpdate(appointment.doctor, { doctorId: appointment.doctor, date: appointment.appointmentDate, queue: updatedQueue });
@@ -646,6 +701,42 @@ exports.updateAppointmentStatus = async (req, res, next) => {
     }
 
     await appointment.save();
+
+    // Role-specific notifications based on status transition
+    if (status === 'In Progress') {
+      const callNotif = await Notification.create({
+        recipient: appointment.patient,
+        recipientRole: 'patient',
+        title: 'Doctor Calling - Consultation Started',
+        message: `Dr. ${appointment.doctorName} is ready to see you now. Please proceed to the OPD consultation room.`,
+        type: 'queue_alert',
+        priority: 'high',
+        metadata: { appointmentId: appointment._id.toString() }
+      });
+      emitNotification(appointment.patient, 'patient', callNotif);
+    } else if (status === 'Completed') {
+      const compNotif = await Notification.create({
+        recipient: appointment.patient,
+        recipientRole: 'patient',
+        title: 'Consultation Completed & Prescription Ready',
+        message: `Your consultation with Dr. ${appointment.doctorName} is complete. Your digital prescription and clinical records are now ready in your portal.`,
+        type: 'prescription_ready',
+        priority: 'medium',
+        metadata: { appointmentId: appointment._id.toString() }
+      });
+      emitNotification(appointment.patient, 'patient', compNotif);
+    } else if (status === 'Expired' || status === 'No-Show') {
+      const expNotif = await Notification.create({
+        recipient: appointment.patient,
+        recipientRole: 'patient',
+        title: 'Appointment Expired / Missed',
+        message: `Your scheduled consultation with Dr. ${appointment.doctorName} on ${appointment.appointmentDate} was marked as missed. Please book a new slot if you still require medical consultation.`,
+        type: 'appointment_update',
+        priority: 'medium',
+        metadata: { appointmentId: appointment._id.toString() }
+      });
+      emitNotification(appointment.patient, 'patient', expNotif);
+    }
 
     // Reorder remaining active queue
     const updatedQueue = await reorderDoctorQueue(appointment.doctor, appointment.appointmentDate);

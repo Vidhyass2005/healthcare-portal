@@ -1,7 +1,7 @@
 const LabTest = require('../models/LabTest');
 const LabBooking = require('../models/LabBooking');
 const Notification = require('../models/Notification');
-const { emitLabReportReady } = require('../services/socketService');
+const { emitLabReportReady, emitNotification } = require('../services/socketService');
 
 // Sample test recommendation rules
 const symptomTestRules = [
@@ -148,15 +148,28 @@ exports.bookLabTest = async (req, res, next) => {
       status: 'Booked'
     });
 
-    // Create confirmation notification
-    await Notification.create({
+    // Create confirmation notification for patient
+    const patientNotif = await Notification.create({
       recipient: patientId,
+      recipientRole: 'patient',
       title: 'Lab Test Booked Successfully',
       message: `Your booking for ${test.name} on ${bookingDate} at ${slotTime} is confirmed. ${isHomeSampleCollection ? 'Home sample collection is scheduled.' : 'Please visit the diagnostic lab.'}`,
       type: 'general',
       priority: 'medium',
       metadata: { labBookingId: labBooking._id.toString() }
     });
+    emitNotification(patientId, 'patient', patientNotif);
+
+    // Notify Admin Operations Desk
+    const adminNotif = await Notification.create({
+      recipientRole: 'admin',
+      title: 'New Diagnostic Lab Booking',
+      message: `Patient ${req.user.name} booked ${test.name} for ${bookingDate} at ${slotTime}.`,
+      type: 'general',
+      priority: 'low',
+      metadata: { labBookingId: labBooking._id.toString() }
+    });
+    emitNotification(null, 'admin', adminNotif);
 
     res.status(201).json({
       success: true,
@@ -228,6 +241,18 @@ exports.updateBookingStatus = async (req, res, next) => {
         doctorRemarks: doctorRemarks || 'Normal clinical findings. Maintain healthy routine.',
         pdfUrl: `/api/lab/reports/${booking._id}/download`
       };
+
+      // Create persistent in-app notification
+      const reportNotif = await Notification.create({
+        recipient: booking.patient,
+        recipientRole: 'patient',
+        title: 'Diagnostic Lab Report Ready',
+        message: `Your test report for ${booking.testName} is now ready for review and download in your portal.`,
+        type: 'lab_report_ready',
+        priority: 'high',
+        metadata: { labBookingId: booking._id.toString() }
+      });
+      emitNotification(booking.patient, 'patient', reportNotif);
 
       // Emit report ready real-time notification
       emitLabReportReady(booking.patient, booking);

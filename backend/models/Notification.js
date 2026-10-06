@@ -8,7 +8,7 @@ const notificationSchema = new mongoose.Schema({
   },
   recipientRole: {
     type: String,
-    enum: ['all', 'patient', 'doctor', 'admin', 'donor'],
+    enum: ['all', 'patient', 'doctor', 'admin'],
     default: 'all'
   },
   title: {
@@ -21,7 +21,16 @@ const notificationSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['emergency_blood', 'appointment_update', 'queue_alert', 'lab_report_ready', 'general'],
+    enum: [
+      'appointment_update',
+      'queue_alert',
+      'lab_report_ready',
+      'prescription_ready',
+      'facility_assistance',
+      'feedback_alert',
+      'emergency_alert',
+      'general'
+    ],
     default: 'general'
   },
   priority: {
@@ -36,9 +45,9 @@ const notificationSchema = new mongoose.Schema({
   metadata: {
     appointmentId: String,
     labBookingId: String,
-    bloodRequestId: String,
-    bloodGroup: String,
-    hospitalName: String
+    feedbackId: String,
+    department: String,
+    targetUrl: String
   },
   createdAt: {
     type: Date,

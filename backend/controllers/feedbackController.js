@@ -1,4 +1,6 @@
 const Feedback = require('../models/Feedback');
+const Notification = require('../models/Notification');
+const { emitNotification } = require('../services/socketService');
 
 exports.createFeedback = async (req, res, next) => {
   try {
@@ -17,6 +19,18 @@ exports.createFeedback = async (req, res, next) => {
       consultationQuestions: consultationQuestions || {},
       comments
     });
+
+    // Notify Admin of patient feedback
+    const adminNotif = await Notification.create({
+      recipientRole: 'admin',
+      title: `New Patient Feedback (${rating}★)`,
+      message: `Patient ${req.user.name} submitted a ${rating}★ review for ${doctorOrDepartment || 'OPD Consultation'}: "${comments.slice(0, 90)}${comments.length > 90 ? '...' : ''}"`,
+      type: 'feedback_alert',
+      priority: Number(rating) <= 2 ? 'high' : 'medium',
+      metadata: { feedbackId: feedback._id.toString() }
+    });
+    emitNotification(null, 'admin', adminNotif);
+
     res.status(201).json({ success: true, message: 'Feedback submitted successfully. Thank you!', feedback });
   } catch (error) {
     next(error);
@@ -61,6 +75,20 @@ exports.updateFeedbackStatus = async (req, res, next) => {
     if (status) feedback.status = status;
     if (adminReply !== undefined) feedback.adminReply = adminReply;
     await feedback.save();
+
+    if (adminReply && feedback.patient) {
+      const patientNotif = await Notification.create({
+        recipient: feedback.patient,
+        recipientRole: 'patient',
+        title: 'MEDCARE Admin Responded to Your Feedback',
+        message: `Administration response: "${adminReply.slice(0, 110)}${adminReply.length > 110 ? '...' : ''}"`,
+        type: 'feedback_alert',
+        priority: 'medium',
+        metadata: { feedbackId: feedback._id.toString() }
+      });
+      emitNotification(feedback.patient, 'patient', patientNotif);
+    }
+
     res.status(200).json({ success: true, message: 'Feedback updated successfully', feedback });
   } catch (error) {
     next(error);

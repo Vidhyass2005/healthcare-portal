@@ -62,10 +62,24 @@ const emitLabReportReady = (userId, labBooking) => {
   }
 };
 
+// Emit real-time notification to user, role, or broadcast
+const emitNotification = (recipientId, recipientRole, notification) => {
+  if (ioInstance) {
+    if (recipientId) {
+      ioInstance.to(`user_${recipientId}`).emit('new_notification', notification);
+    }
+    if (recipientRole && recipientRole !== 'all') {
+      ioInstance.to(`role_${recipientRole}`).emit('new_notification', notification);
+    }
+    ioInstance.emit('global_notification', notification);
+  }
+};
+
 module.exports = {
   initSocket,
   getIO,
   emitQueueUpdate,
   emitAppointmentUpdate,
-  emitLabReportReady
+  emitLabReportReady,
+  emitNotification
 };

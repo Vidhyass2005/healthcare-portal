@@ -2,6 +2,8 @@ const Appointment = require('../models/Appointment');
 const User = require('../models/User');
 const LabBooking = require('../models/LabBooking');
 const LabTest = require('../models/LabTest');
+const Notification = require('../models/Notification');
+const { emitNotification } = require('../services/socketService');
 
 // @desc Get comprehensive Admin analytics for charts and monitoring
 // @route GET /api/admin/analytics
@@ -312,6 +314,19 @@ exports.updateAssistanceStatus = async (req, res, next) => {
     appointment.specialAssistance.updatedAt = new Date();
 
     await appointment.save();
+
+    if (status === 'Assigned') {
+      const assistanceNotif = await Notification.create({
+        recipient: appointment.patient,
+        recipientRole: 'patient',
+        title: 'Assistance Confirmed - Porter Assigned',
+        message: `Your special assistance request has been assigned. Staff: ${appointment.specialAssistance.assignedStaffName || 'Porter Desk'}${appointment.specialAssistance.assignedBedNumber ? `, Bed: ${appointment.specialAssistance.assignedBedNumber}` : ''}. Our team will assist you upon arrival.`,
+        type: 'facility_assistance',
+        priority: 'medium',
+        metadata: { appointmentId: appointment._id.toString() }
+      });
+      emitNotification(appointment.patient, 'patient', assistanceNotif);
+    }
 
     res.status(200).json({
       success: true,

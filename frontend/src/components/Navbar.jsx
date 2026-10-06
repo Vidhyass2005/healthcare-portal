@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { useSocket } from '../context/SocketContext';
+import { notificationService } from '../services/api';
 import { NotificationDropdown } from './NotificationDropdown';
 import {
   Heart,
@@ -23,6 +24,24 @@ export const Navbar = ({ onToggleSidebar }) => {
   const { language, toggleLanguage, t } = useLanguage();
   const { activeAlerts } = useSocket();
   const [showNotifications, setShowNotifications] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadUnread = async () => {
+      if (!user) return;
+      try {
+        const res = await notificationService.getMy();
+        if (isMounted && res.data && typeof res.data.unreadCount === 'number') {
+          setUnreadCount(res.data.unreadCount);
+        }
+      } catch (err) {
+        console.error('Error fetching unread notification count:', err);
+      }
+    };
+    loadUnread();
+    return () => { isMounted = false; };
+  }, [user, activeAlerts]);
 
   const getRoleBadge = (role) => {
     switch (role) {
@@ -100,18 +119,23 @@ export const Navbar = ({ onToggleSidebar }) => {
             <div className="relative">
               <button
                 onClick={() => setShowNotifications(!showNotifications)}
-                className="relative p-2 rounded-xl text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition"
-                title="Notifications"
+                className="relative p-2 rounded-xl text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition cursor-pointer"
+                title={`Notifications (${unreadCount} unread)`}
               >
-                <Bell className="w-5 h-5" />
-                {activeAlerts.length > 0 && (
-                  <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-600 rounded-full ring-2 ring-white animate-ping"></span>
-                )}
+                <Bell className="w-5 h-5 text-slate-700" />
+                {unreadCount > 0 ? (
+                  <span className="absolute -top-1 -right-1 bg-rose-600 text-white text-[10px] font-extrabold px-1 min-w-[18px] h-[18px] flex items-center justify-center rounded-full ring-2 ring-white shadow-xs animate-in zoom-in-50">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                ) : activeAlerts.length > 0 ? (
+                  <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-amber-500 rounded-full ring-2 ring-white"></span>
+                ) : null}
               </button>
 
               <NotificationDropdown
                 isOpen={showNotifications}
                 onClose={() => setShowNotifications(false)}
+                onUnreadCountChange={setUnreadCount}
               />
             </div>
 
