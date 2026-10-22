@@ -1,4 +1,4 @@
-# Outpatient Appointment Scheduling Portal with Clinical Priority Sorting, Blood Donation & Lab Booking System
+# Outpatient Appointment Scheduling Portal with Clinical Priority Sorting & Lab Booking System
 
 A full-stack, enterprise-grade healthcare management application featuring intelligent clinical triage sorting, outpatient slot scheduling, blood donation & emergency donor matching, and lab test booking with real-time Socket.io synchronization.
 
