@@ -63,8 +63,6 @@ export function App() {
         if (user.role === 'doctor') return <DoctorDashboard onNavigate={navigate} />;
         return <BookAppointmentPage onNavigate={navigate} />;
       case '/lab-tests':
-        if (user.role === 'admin') return <AdminDashboard onNavigate={navigate} />;
-        if (user.role === 'doctor') return <DoctorDashboard onNavigate={navigate} />;
         return <BookLabTestPage onNavigate={navigate} />;
       case '/queue-tracker':
         return <QueueTrackerPage onNavigate={navigate} />;

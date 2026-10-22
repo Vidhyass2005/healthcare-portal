@@ -13,7 +13,9 @@ import {
   FileText,
   Calendar,
   Building,
-  ArrowRight
+  ArrowRight,
+  UserCheck,
+  Stethoscope
 } from 'lucide-react';
 
 // Time helpers to ensure no past timing booking and only future timings are visible
@@ -24,6 +26,25 @@ const getTodayDateString = () => {
   const day = String(d.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 };
+
+const getTomorrowDateString = (offsetDays = 1) => {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const ALL_LAB_WINDOWS = [
+  '07:00 AM', '07:30 AM', '08:00 AM', '08:30 AM',
+  '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM',
+  '11:00 AM', '11:30 AM', '12:00 PM', '12:30 PM',
+  '01:00 PM', '01:30 PM', '02:00 PM', '02:30 PM',
+  '03:00 PM', '03:30 PM', '04:00 PM', '04:30 PM',
+  '05:00 PM', '05:30 PM', '06:00 PM', '06:30 PM',
+  '07:00 PM', '07:30 PM'
+];
 
 const isSlotInPast = (dateStr, slotTimeStr) => {
   const now = new Date();
@@ -39,11 +60,18 @@ const isSlotInPast = (dateStr, slotTimeStr) => {
   minutes = parseInt(minutes, 10);
   if (period.toUpperCase() === 'PM' && hours < 12) hours += 12;
   if (period.toUpperCase() === 'AM' && hours === 12) hours = 0;
-  const slotDate = new Date(year, month - 1, day, hours, minutes, 0, 0);
+  
+  // 15-minute grace period buffer to avoid race condition rejections
+  const slotDate = new Date(year, month - 1, day, hours, minutes + 15, 0, 0);
   return slotDate <= now;
 };
 
-const ALL_LAB_WINDOWS = ['07:30 AM', '08:30 AM', '09:30 AM', '10:30 AM', '11:30 AM', '02:30 PM', '04:30 PM'];
+const getInitialBookingDate = () => {
+  const today = getTodayDateString();
+  const hasSlotToday = ALL_LAB_WINDOWS.some(slot => !isSlotInPast(today, slot));
+  return hasSlotToday ? today : getTomorrowDateString(1);
+};
+
 const categories = ['All', 'Pathology', 'Radiology', 'Cardiology', 'Biochemistry', 'Microbiology'];
 
 export const BookLabTestPage = ({ onNavigate }) => {
@@ -55,9 +83,12 @@ export const BookLabTestPage = ({ onNavigate }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTest, setSelectedTest] = useState(null);
 
-  // Booking fields
+  // Booking fields with smart date selection
   const todayStr = getTodayDateString();
-  const [bookingDate, setBookingDate] = useState(() => getTodayDateString());
+  const tomorrowStr = getTomorrowDateString(1);
+  const dayAfterStr = getTomorrowDateString(2);
+
+  const [bookingDate, setBookingDate] = useState(getInitialBookingDate);
   const isPastDate = bookingDate < todayStr;
   const isToday = bookingDate === todayStr;
 
@@ -72,8 +103,10 @@ export const BookLabTestPage = ({ onNavigate }) => {
 
   // Automatically ensure slotTime selects a valid future slot
   useEffect(() => {
-    if (!visibleLabSlots.includes(slotTime)) {
-      setSlotTime(visibleLabSlots[0] || '');
+    if (visibleLabSlots.length > 0 && !visibleLabSlots.includes(slotTime)) {
+      setSlotTime(visibleLabSlots[0]);
+    } else if (visibleLabSlots.length === 0) {
+      setSlotTime('');
     }
   }, [visibleLabSlots, slotTime]);
 
@@ -110,7 +143,7 @@ export const BookLabTestPage = ({ onNavigate }) => {
 
   // Load user's appointments for optional linkage
   useEffect(() => {
-    if (user) {
+    if (user && user.role === 'patient') {
       appointmentService.getMy().then(res => {
         setUserAppointments(res.data.appointments || []);
       }).catch(console.error);
@@ -119,23 +152,34 @@ export const BookLabTestPage = ({ onNavigate }) => {
 
   const handleConfirmLabBooking = async (e) => {
     e.preventDefault();
-    if (!selectedTest) return;
+    if (!selectedTest) {
+      setError('Please select a diagnostic test from the catalog.');
+      return;
+    }
 
     if (bookingDate < todayStr || isSlotInPast(bookingDate, slotTime)) {
       setError('Cannot book diagnostic lab tests for past dates or past time slots. Please choose a future timing.');
       return;
     }
 
+    if (!slotTime) {
+      setError('Please select an available collection time window.');
+      return;
+    }
+
     try {
       setError('');
+      const defaultDoctor = user?.role === 'doctor' ? `Dr. ${user.name}` : 'Self / OPD Physician';
+      const selectedDoc = userAppointments.find(a => a._id === linkedApptId)?.doctorName || defaultDoctor;
+
       const res = await labService.bookTest({
         labTestId: selectedTest._id,
         bookingDate,
         slotTime,
         isHomeSampleCollection: isHomeCollection,
-        collectionAddress,
+        collectionAddress: isHomeCollection ? collectionAddress : undefined,
         linkedAppointment: linkedApptId || null,
-        referringDoctor: userAppointments.find(a => a._id === linkedApptId)?.doctorName || 'Self / OPD Physician'
+        referringDoctor: selectedDoc
       });
 
       setBookingSuccess(res.data.booking);
@@ -145,38 +189,35 @@ export const BookLabTestPage = ({ onNavigate }) => {
         origin: { y: 0.6 }
       });
     } catch (err) {
-      setError(err.response?.data?.message || 'Error booking lab test');
+      setError(err.response?.data?.message || 'Error booking lab test. Please try again.');
     }
   };
 
-  if (user?.role === 'doctor' || user?.role === 'admin') {
-    return (
-      <div className="max-w-md mx-auto my-16 bg-white p-8 rounded-3xl border border-slate-200 shadow-xl text-center space-y-4">
-        <div className="w-14 h-14 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center mx-auto">
-          <AlertCircle className="w-8 h-8" />
-        </div>
-        <h2 className="text-xl font-bold text-slate-900">Patient-Only Service</h2>
-        <p className="text-xs text-slate-500 leading-relaxed">
-          Diagnostic lab test booking is reserved strictly for patients. Doctors can recommend investigations during outpatient consultations, and Administrators manage tests in the Hospital Catalog.
-        </p>
-        <button
-          onClick={() => onNavigate(user.role === 'doctor' ? '/doctor-dashboard' : '/admin-dashboard')}
-          className="bg-sky-600 hover:bg-sky-500 text-white font-bold px-5 py-2.5 rounded-xl text-xs shadow transition"
-        >
-          Return to {user.role === 'doctor' ? 'Doctor Dashboard' : 'Admin Dashboard'}
-        </button>
-      </div>
-    );
-  }
-
   return (
-    <div className="max-w-5xl mx-auto py-6 space-y-8 pb-20">
+    <div className="max-w-5xl mx-auto py-6 space-y-6 pb-20 px-3 sm:px-4">
       {/* Header */}
       <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-teal-950 text-white rounded-3xl p-6 sm:p-8 shadow-xl space-y-2">
-        <div className="inline-flex items-center gap-2 bg-emerald-500/20 text-emerald-300 text-xs px-3 py-1 rounded-full border border-emerald-400/30 font-semibold">
-          <FlaskConical className="w-3.5 h-3.5" />
-          <span>Diagnostic Laboratory & Imaging Services</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="inline-flex items-center gap-2 bg-emerald-500/20 text-emerald-300 text-xs px-3 py-1 rounded-full border border-emerald-400/30 font-semibold">
+            <FlaskConical className="w-3.5 h-3.5" />
+            <span>Diagnostic Laboratory & Imaging Services</span>
+          </div>
+
+          {user?.role === 'doctor' && (
+            <span className="inline-flex items-center gap-1.5 bg-blue-500/20 text-blue-300 text-xs px-3 py-1 rounded-full border border-blue-400/30 font-semibold">
+              <Stethoscope className="w-3.5 h-3.5" />
+              <span>Clinician Mode: Ordering Diagnostic Investigation</span>
+            </span>
+          )}
+
+          {user?.role === 'admin' && (
+            <span className="inline-flex items-center gap-1.5 bg-amber-500/20 text-amber-300 text-xs px-3 py-1 rounded-full border border-amber-400/30 font-semibold">
+              <UserCheck className="w-3.5 h-3.5" />
+              <span>Admin Operations: Lab Registration</span>
+            </span>
+          )}
         </div>
+
         <h1 className="text-2xl sm:text-3xl font-extrabold">Book Diagnostic Lab Test</h1>
         <p className="text-xs sm:text-sm text-slate-300">
           Search comprehensive pathology & imaging panels • Home sample phlebotomy • Linked doctor consultations
@@ -276,8 +317,11 @@ export const BookLabTestPage = ({ onNavigate }) => {
             onSubmit={handleConfirmLabBooking}
             className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4 sticky top-20 text-xs"
           >
-            <h3 className="font-bold text-slate-900 text-sm border-b border-slate-100 pb-3">
-              Lab Booking Details
+            <h3 className="font-bold text-slate-900 text-sm border-b border-slate-100 pb-3 flex items-center justify-between">
+              <span>Lab Booking Details</span>
+              <span className="text-[10px] text-emerald-600 font-semibold bg-emerald-50 px-2 py-0.5 rounded-full">
+                MedCare Lab
+              </span>
             </h3>
 
             {selectedTest && (
@@ -288,21 +332,61 @@ export const BookLabTestPage = ({ onNavigate }) => {
               </div>
             )}
 
+            {/* Date Selection with Quick Chips */}
             <div>
-              <div className="flex justify-between items-center mb-1">
+              <div className="flex justify-between items-center mb-1.5">
                 <label className="block font-bold text-slate-700">Collection Date</label>
-                <span className="text-[10px] text-slate-400">Only future dates available</span>
+                <span className="text-[10px] text-slate-400">Future dates only</span>
               </div>
+
+              {/* Quick Date Chips */}
+              <div className="grid grid-cols-3 gap-1.5 mb-2">
+                <button
+                  type="button"
+                  onClick={() => setBookingDate(todayStr)}
+                  className={`py-1.5 text-[11px] rounded-lg font-semibold transition border ${
+                    bookingDate === todayStr
+                      ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                      : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  Today
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBookingDate(tomorrowStr)}
+                  className={`py-1.5 text-[11px] rounded-lg font-semibold transition border ${
+                    bookingDate === tomorrowStr
+                      ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                      : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  Tomorrow
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBookingDate(dayAfterStr)}
+                  className={`py-1.5 text-[11px] rounded-lg font-semibold transition border ${
+                    bookingDate === dayAfterStr
+                      ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                      : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  Day After
+                </button>
+              </div>
+
               <input
                 type="date"
                 required
                 value={bookingDate}
                 min={todayStr}
                 onChange={(e) => setBookingDate(e.target.value)}
-                className="w-full p-2 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-emerald-500"
+                className="w-full p-2 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
               />
             </div>
 
+            {/* Time Slot Selection */}
             <div>
               <label className="block font-bold text-slate-700 mb-1">Time Window</label>
               {isPastDate ? (
@@ -310,17 +394,27 @@ export const BookLabTestPage = ({ onNavigate }) => {
                   Past dates cannot be selected. Please choose today or a future date.
                 </div>
               ) : visibleLabSlots.length === 0 ? (
-                <div className="p-2.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl text-xs space-y-1">
-                  <div className="font-bold">All collection windows for today have passed</div>
-                  <p className="text-[10px] text-amber-700">
-                    Diagnostic collection windows close once the time has passed. Please choose tomorrow or another future date above.
+                <div className="p-3 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl text-xs space-y-2">
+                  <div className="font-bold flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-amber-600" />
+                    <span>All slots for today have completed</span>
+                  </div>
+                  <p className="text-[11px] text-amber-700">
+                    Diagnostic collection windows close once the time passes. Please choose tomorrow or another upcoming date.
                   </p>
+                  <button
+                    type="button"
+                    onClick={() => setBookingDate(tomorrowStr)}
+                    className="w-full bg-amber-600 hover:bg-amber-500 text-white py-1.5 px-3 rounded-lg text-xs font-semibold shadow-xs transition"
+                  >
+                    Switch to Tomorrow ({tomorrowStr})
+                  </button>
                 </div>
               ) : (
                 <select
                   value={slotTime}
                   onChange={(e) => setSlotTime(e.target.value)}
-                  className="w-full p-2 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-emerald-500"
+                  className="w-full p-2 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
                 >
                   {visibleLabSlots.map((t) => (
                     <option key={t} value={t}>{t}</option>
@@ -334,13 +428,13 @@ export const BookLabTestPage = ({ onNavigate }) => {
               <div className="flex items-center justify-between">
                 <div>
                   <span className="font-bold text-slate-800 block">Home Sample Collection</span>
-                  <span className="text-[10px] text-slate-500">+₹150 phlebotomist visit</span>
+                  <span className="text-[10px] text-slate-500">+₹150 phlebotomist visit fee</span>
                 </div>
                 <input
                   type="checkbox"
                   checked={isHomeCollection}
                   onChange={(e) => setIsHomeCollection(e.target.checked)}
-                  className="w-4 h-4 rounded text-emerald-600"
+                  className="w-4 h-4 rounded text-emerald-600 accent-emerald-600 cursor-pointer"
                 />
               </div>
 
@@ -350,27 +444,29 @@ export const BookLabTestPage = ({ onNavigate }) => {
                   placeholder="Enter home pickup address..."
                   value={collectionAddress}
                   onChange={(e) => setCollectionAddress(e.target.value)}
-                  className="w-full p-2 bg-white border rounded-lg text-xs"
+                  className="w-full p-2 bg-white border border-slate-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               )}
             </div>
 
             {/* Linked Appointment */}
-            <div>
-              <label className="block font-bold text-slate-700 mb-1">Link to OPD Doctor (Optional)</label>
-              <select
-                value={linkedApptId}
-                onChange={(e) => setLinkedApptId(e.target.value)}
-                className="w-full p-2 bg-slate-50 border rounded-xl"
-              >
-                <option value="">None (Self Booking / General Triage)</option>
-                {userAppointments.map(a => (
-                  <option key={a._id} value={a._id}>
-                    {a.doctorName} ({a.department}) - {a.appointmentDate}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {userAppointments.length > 0 && (
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Link to OPD Doctor (Optional)</label>
+                <select
+                  value={linkedApptId}
+                  onChange={(e) => setLinkedApptId(e.target.value)}
+                  className="w-full p-2 bg-slate-50 border rounded-xl outline-none text-xs"
+                >
+                  <option value="">None (Self Booking / General Triage)</option>
+                  {userAppointments.map(a => (
+                    <option key={a._id} value={a._id}>
+                      {a.doctorName} ({a.department}) - {a.appointmentDate}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {/* Total Calculation */}
             <div className="pt-2 border-t border-slate-100 flex justify-between items-center text-sm font-bold text-slate-900">
@@ -383,7 +479,7 @@ export const BookLabTestPage = ({ onNavigate }) => {
             <button
               type="submit"
               disabled={!selectedTest || visibleLabSlots.length === 0 || !slotTime || isPastDate}
-              className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold py-3 rounded-xl shadow-md transition flex items-center justify-center gap-2"
+              className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl shadow-md transition flex items-center justify-center gap-2 cursor-pointer"
             >
               <span>Confirm Lab Booking</span>
               <ArrowRight className="w-4 h-4" />
@@ -416,19 +512,25 @@ export const BookLabTestPage = ({ onNavigate }) => {
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500">Collection Mode:</span>
-                <strong className="text-emerald-700">{bookingSuccess.isHomeSampleCollection ? 'Home Phlebotomy Collection' : 'Central Diagnostic Lab'}</strong>
+                <strong className="text-emerald-700">
+                  {bookingSuccess.isHomeSampleCollection ? 'Home Phlebotomy Collection' : 'Central Diagnostic Lab'}
+                </strong>
               </div>
               <div className="flex justify-between border-t border-slate-200 pt-2 font-bold">
                 <span>Total Amount:</span>
-                <span>₹{bookingSuccess.totalAmount} (Paid)</span>
+                <span>₹{bookingSuccess.totalAmount} (Confirmed)</span>
               </div>
             </div>
 
             <button
-              onClick={() => onNavigate('/patient-dashboard')}
-              className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-xl text-xs shadow transition"
+              onClick={() => {
+                if (user?.role === 'doctor') onNavigate('/doctor-dashboard');
+                else if (user?.role === 'admin') onNavigate('/admin-dashboard');
+                else onNavigate('/patient-dashboard');
+              }}
+              className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-xl text-xs shadow transition cursor-pointer"
             >
-              Go to Dashboard & Records
+              Return to {user?.role === 'doctor' ? 'Doctor Dashboard' : user?.role === 'admin' ? 'Admin Dashboard' : 'Dashboard & Records'}
             </button>
           </div>
         </div>

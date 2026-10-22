@@ -69,7 +69,9 @@ const isSlotInPast = (dateStr, slotTimeStr) => {
   minutes = parseInt(minutes, 10);
   if (period.toUpperCase() === 'PM' && hours < 12) hours += 12;
   if (period.toUpperCase() === 'AM' && hours === 12) hours = 0;
-  const slotDate = new Date(year, month - 1, day, hours, minutes, 0, 0);
+  
+  // 15-minute grace period to prevent edge-case timing rejections
+  const slotDate = new Date(year, month - 1, day, hours, minutes + 15, 0, 0);
   return slotDate <= now;
 };
 
@@ -77,14 +79,6 @@ const isSlotInPast = (dateStr, slotTimeStr) => {
 // @route POST /api/lab/book
 exports.bookLabTest = async (req, res, next) => {
   try {
-    // Restrict booking: Doctors and Administrators cannot book lab tests
-    if (req.user.role === 'admin' || req.user.role === 'doctor') {
-      return res.status(403).json({
-        success: false,
-        message: 'Lab test booking is reserved for patients only. Doctors and administrators cannot book diagnostic slots.'
-      });
-    }
-
     const {
       labTestId,
       bookingDate,
@@ -94,10 +88,15 @@ exports.bookLabTest = async (req, res, next) => {
       linkedAppointment,
       referringDoctor,
       priorityLevel,
-      paymentStatus
+      paymentStatus,
+      patientId: customPatientId,
+      patientName: customPatientName,
+      patientPhone: customPatientPhone
     } = req.body;
 
-    const patientId = req.user.id;
+    const patientId = customPatientId || req.user.id;
+    const patientName = customPatientName || req.user.name || 'Patient';
+    const patientPhone = customPatientPhone || req.user.phone || '';
 
     // Reject past date or past time slot bookings
     const todayStr = getLocalDateString();
@@ -120,27 +119,33 @@ exports.bookLabTest = async (req, res, next) => {
       status: { $ne: 'Cancelled' }
     });
 
-    if (existingBookingsCount >= test.dailyCapacity) {
+    const capacity = test.dailyCapacity || 30;
+    if (existingBookingsCount >= capacity) {
       return res.status(400).json({
         success: false,
-        message: `Maximum daily capacity (${test.dailyCapacity} slots) reached for ${test.name} on ${bookingDate}. Please choose another date.`
+        message: `Maximum daily capacity (${capacity} slots) reached for ${test.name} on ${bookingDate}. Please choose another date.`
       });
     }
 
     const homeCollectionFee = isHomeSampleCollection ? 150 : 0;
     const totalAmount = test.price + homeCollectionFee;
 
+    const mongoose = require('mongoose');
+    const safeLinkedAppointment = (linkedAppointment && mongoose.Types.ObjectId.isValid(linkedAppointment))
+      ? linkedAppointment
+      : null;
+
     const labBooking = await LabBooking.create({
       patient: patientId,
-      patientName: req.user.name,
-      patientPhone: req.user.phone || '',
+      patientName,
+      patientPhone,
       labTest: test._id,
       testName: test.name,
       bookingDate,
       slotTime: slotTime || '09:00 AM',
       isHomeSampleCollection: Boolean(isHomeSampleCollection),
       collectionAddress: collectionAddress || req.user.city || '',
-      linkedAppointment: linkedAppointment || null,
+      linkedAppointment: safeLinkedAppointment,
       referringDoctor: referringDoctor || 'Self / General OPD',
       totalAmount,
       paymentStatus: paymentStatus || 'Paid',
@@ -153,7 +158,7 @@ exports.bookLabTest = async (req, res, next) => {
       recipient: patientId,
       recipientRole: 'patient',
       title: 'Lab Test Booked Successfully',
-      message: `Your booking for ${test.name} on ${bookingDate} at ${slotTime} is confirmed. ${isHomeSampleCollection ? 'Home sample collection is scheduled.' : 'Please visit the diagnostic lab.'}`,
+      message: `Your booking for ${test.name} on ${bookingDate} at ${slotTime || '09:00 AM'} is confirmed. ${isHomeSampleCollection ? 'Home sample collection is scheduled.' : 'Please visit the diagnostic lab.'}`,
       type: 'general',
       priority: 'medium',
       metadata: { labBookingId: labBooking._id.toString() }
@@ -164,7 +169,7 @@ exports.bookLabTest = async (req, res, next) => {
     const adminNotif = await Notification.create({
       recipientRole: 'admin',
       title: 'New Diagnostic Lab Booking',
-      message: `Patient ${req.user.name} booked ${test.name} for ${bookingDate} at ${slotTime}.`,
+      message: `Patient ${patientName} booked ${test.name} for ${bookingDate} at ${slotTime || '09:00 AM'}.`,
       type: 'general',
       priority: 'low',
       metadata: { labBookingId: labBooking._id.toString() }
