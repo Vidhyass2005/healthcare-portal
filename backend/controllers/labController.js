@@ -3,6 +3,150 @@ const LabBooking = require('../models/LabBooking');
 const Notification = require('../models/Notification');
 const { emitLabReportReady, emitNotification } = require('../services/socketService');
 
+// Default Diagnostic Lab Tests Catalog for self-seeding
+const DEFAULT_LAB_TESTS = [
+  {
+    name: 'Complete Blood Count (CBC) with ESR',
+    category: 'Pathology',
+    code: 'CBC-01',
+    description: 'Comprehensive screening test evaluating red blood cells, white blood cells, platelets, and infection markers.',
+    price: 450,
+    sampleType: 'Blood',
+    fastingRequired: false,
+    preparationInstructions: 'No special preparation needed.',
+    turnaroundHours: 12,
+    dailyCapacity: 40,
+    isHomeSampleAvailable: true,
+    recommendedForSymptoms: ['fever', 'fatigue', 'infection', 'anemia', 'weakness']
+  },
+  {
+    name: 'Comprehensive Lipid Profile',
+    category: 'Biochemistry',
+    code: 'LIP-01',
+    description: 'Measures total cholesterol, HDL, LDL, VLDL, and triglycerides for cardiovascular health risk assessment.',
+    price: 650,
+    sampleType: 'Blood',
+    fastingRequired: true,
+    preparationInstructions: '10 to 12 hours of overnight fasting required before sample collection.',
+    turnaroundHours: 24,
+    dailyCapacity: 30,
+    isHomeSampleAvailable: true,
+    recommendedForSymptoms: ['chest pain', 'palpitation', 'hypertension', 'heart', 'obesity']
+  },
+  {
+    name: 'HbA1c (Glycosylated Hemoglobin)',
+    category: 'Biochemistry',
+    code: 'HBA1C-01',
+    description: 'Reflects average blood glucose control over the past 2 to 3 months. Essential for diabetes management.',
+    price: 500,
+    sampleType: 'Blood',
+    fastingRequired: false,
+    preparationInstructions: 'Can be done at any time of day, fasting not mandatory.',
+    turnaroundHours: 12,
+    dailyCapacity: 35,
+    isHomeSampleAvailable: true,
+    recommendedForSymptoms: ['diabetes', 'sugar', 'frequent urination', 'excessive thirst']
+  },
+  {
+    name: 'Liver Function Test (LFT Profile)',
+    category: 'Biochemistry',
+    code: 'LFT-01',
+    description: 'Measures Bilirubin (Total/Direct), SGOT (AST), SGPT (ALT), Alkaline Phosphatase, and Total Protein.',
+    price: 700,
+    sampleType: 'Blood',
+    fastingRequired: true,
+    preparationInstructions: '8 hours of fasting recommended.',
+    turnaroundHours: 18,
+    dailyCapacity: 25,
+    isHomeSampleAvailable: true,
+    recommendedForSymptoms: ['jaundice', 'nausea', 'abdominal pain', 'alcohol screening']
+  },
+  {
+    name: 'Renal / Kidney Function Test (KFT)',
+    category: 'Biochemistry',
+    code: 'KFT-01',
+    description: 'Evaluates kidney performance via Blood Urea Nitrogen (BUN), Serum Creatinine, and Uric Acid.',
+    price: 600,
+    sampleType: 'Blood',
+    fastingRequired: false,
+    preparationInstructions: 'Stay adequately hydrated.',
+    turnaroundHours: 12,
+    dailyCapacity: 30,
+    isHomeSampleAvailable: true,
+    recommendedForSymptoms: ['edema', 'swelling', 'flank pain', 'hypertension']
+  },
+  {
+    name: 'Thyroid Stimulating Hormone (TSH) & Profile',
+    category: 'Biochemistry',
+    code: 'THY-01',
+    description: 'Assesses thyroid gland function measuring T3, T4, and TSH hormones.',
+    price: 550,
+    sampleType: 'Blood',
+    fastingRequired: true,
+    preparationInstructions: 'Early morning sample preferred, prior to thyroid medications.',
+    turnaroundHours: 24,
+    dailyCapacity: 35,
+    isHomeSampleAvailable: true,
+    recommendedForSymptoms: ['weight gain', 'fatigue', 'hair loss', 'cold intolerance']
+  },
+  {
+    name: 'Digital Chest X-Ray (PA View)',
+    category: 'Radiology',
+    code: 'XRAY-01',
+    description: 'Evaluates lungs, cardiac silhouette, mediastinum, pleura, and thoracic cage structure.',
+    price: 400,
+    sampleType: 'Digital Radiograph',
+    fastingRequired: false,
+    preparationInstructions: 'Remove upper body metallic accessories.',
+    turnaroundHours: 4,
+    dailyCapacity: 50,
+    isHomeSampleAvailable: false,
+    recommendedForSymptoms: ['cough', 'chest pain', 'breathlessness', 'fever', 'pneumonia']
+  },
+  {
+    name: 'MRI Brain (Plain + Contrast)',
+    category: 'Radiology',
+    code: 'MRI-01',
+    description: 'High-resolution magnetic resonance imaging of brain parenchyma, ventricles, and neurovasculature.',
+    price: 6500,
+    sampleType: 'Scan Imaging',
+    fastingRequired: false,
+    preparationInstructions: 'Remove all metallic objects, jewelry, and watches prior to scan.',
+    turnaroundHours: 24,
+    dailyCapacity: 10,
+    isHomeSampleAvailable: false,
+    recommendedForSymptoms: ['headache', 'dizziness', 'seizure', 'neurological deficit', 'stroke']
+  },
+  {
+    name: '12-Lead Resting Electrocardiogram (ECG)',
+    category: 'Cardiology',
+    code: 'ECG-01',
+    description: 'Records electrical activity of the heart to detect arrhythmias, ischemia, or prior myocardial infarction.',
+    price: 300,
+    sampleType: 'Electrical Trace',
+    fastingRequired: false,
+    preparationInstructions: 'Avoid heavy exertion 30 minutes prior to test.',
+    turnaroundHours: 2,
+    dailyCapacity: 60,
+    isHomeSampleAvailable: true,
+    recommendedForSymptoms: ['chest pain', 'palpitation', 'shortness of breath', 'syncope']
+  },
+  {
+    name: 'Urine Routine & Microscopic Examination',
+    category: 'Pathology',
+    code: 'URINE-01',
+    description: 'Physical, chemical, and microscopic examination for renal health, infection, and glycosuria.',
+    price: 250,
+    sampleType: 'Urine',
+    fastingRequired: false,
+    preparationInstructions: 'Clean catch midstream morning urine sample.',
+    turnaroundHours: 6,
+    dailyCapacity: 50,
+    isHomeSampleAvailable: true,
+    recommendedForSymptoms: ['burning micturition', 'dysuria', 'frequent urination', 'back pain']
+  }
+];
+
 // Sample test recommendation rules
 const symptomTestRules = [
   { keywords: ['chest pain', 'heart', 'palpitation', 'breathless', 'hypertension'], tests: ['ECG-01', 'LIP-01', 'TROP-01'] },
@@ -13,10 +157,21 @@ const symptomTestRules = [
   { keywords: ['headache', 'migraine', 'dizziness', 'seizure'], tests: ['MRI-01', 'CBC-01'] }
 ];
 
-// @desc Get all lab tests catalog
+// @desc Get all lab tests catalog with auto-seeding
 // @route GET /api/lab/tests
 exports.getLabTests = async (req, res, next) => {
   try {
+    // Auto-seed catalog if database currently has 0 tests
+    const existingCount = await LabTest.countDocuments();
+    if (existingCount === 0) {
+      try {
+        await LabTest.insertMany(DEFAULT_LAB_TESTS);
+        console.log('Auto-seeded default diagnostic lab tests catalog.');
+      } catch (seedErr) {
+        console.warn('Auto-seed lab tests notice:', seedErr.message);
+      }
+    }
+
     const { category, search, fasting } = req.query;
     let query = {};
 
@@ -39,6 +194,26 @@ exports.getLabTests = async (req, res, next) => {
     const tests = await LabTest.find(query).sort({ category: 1, name: 1 });
     res.status(200).json({
       success: true,
+      count: tests.length,
+      tests
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc Seed default lab tests on demand
+// @route GET /api/lab/seed-tests
+exports.seedDefaultTests = async (req, res, next) => {
+  try {
+    const existingCount = await LabTest.countDocuments();
+    if (existingCount === 0) {
+      await LabTest.insertMany(DEFAULT_LAB_TESTS);
+    }
+    const tests = await LabTest.find().sort({ category: 1, name: 1 });
+    res.status(200).json({
+      success: true,
+      message: `Database has ${tests.length} diagnostic lab tests cataloged.`,
       count: tests.length,
       tests
     });
@@ -81,6 +256,8 @@ exports.bookLabTest = async (req, res, next) => {
   try {
     const {
       labTestId,
+      testCode,
+      testName: requestedTestName,
       bookingDate,
       slotTime,
       isHomeSampleCollection,
@@ -107,14 +284,37 @@ exports.bookLabTest = async (req, res, next) => {
       });
     }
 
-    const test = await LabTest.findById(labTestId);
+    const mongoose = require('mongoose');
+    let test = null;
+
+    if (labTestId && mongoose.Types.ObjectId.isValid(labTestId)) {
+      test = await LabTest.findById(labTestId);
+    }
+    if (!test && (testCode || requestedTestName)) {
+      test = await LabTest.findOne({
+        $or: [
+          ...(testCode ? [{ code: testCode }] : []),
+          ...(requestedTestName ? [{ name: requestedTestName }] : [])
+        ]
+      });
+    }
+    // If test is still not found in DB, auto-populate from default catalog
+    if (!test) {
+      const matchDefault = DEFAULT_LAB_TESTS.find(t => t.code === testCode || t.name === requestedTestName) || DEFAULT_LAB_TESTS[0];
+      test = await LabTest.findOneAndUpdate(
+        { code: matchDefault.code },
+        matchDefault,
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      );
+    }
+
     if (!test) {
       return res.status(404).json({ success: false, message: 'Lab test not found' });
     }
 
     // Check capacity for that day
     const existingBookingsCount = await LabBooking.countDocuments({
-      labTest: labTestId,
+      labTest: test._id,
       bookingDate,
       status: { $ne: 'Cancelled' }
     });
@@ -130,7 +330,6 @@ exports.bookLabTest = async (req, res, next) => {
     const homeCollectionFee = isHomeSampleCollection ? 150 : 0;
     const totalAmount = test.price + homeCollectionFee;
 
-    const mongoose = require('mongoose');
     const safeLinkedAppointment = (linkedAppointment && mongoose.Types.ObjectId.isValid(linkedAppointment))
       ? linkedAppointment
       : null;

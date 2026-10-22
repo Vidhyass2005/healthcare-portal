@@ -66,12 +66,14 @@ export const priorityService = {
 // Lab Services
 export const labService = {
   getTests: (params) => api.get('/lab/tests', { params }),
+  seedTests: () => api.get('/lab/seed-tests'),
   createTest: (data) => api.post('/lab/tests', data),
   bookTest: (data) => api.post('/lab/book', data),
   getBookings: (params) => api.get('/lab/bookings', { params }),
   updateStatus: (id, data) => api.put(`/lab/bookings/${id}/status`, data),
   recommendTests: (symptoms) => api.post('/lab/recommend', { symptoms })
 };
+
 
 // Doctor Services
 export const doctorService = {

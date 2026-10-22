@@ -72,16 +72,149 @@ const getInitialBookingDate = () => {
   return hasSlotToday ? today : getTomorrowDateString(1);
 };
 
+const FALLBACK_LAB_TESTS = [
+  {
+    _id: 'fallback-cbc-01',
+    name: 'Complete Blood Count (CBC) with ESR',
+    category: 'Pathology',
+    code: 'CBC-01',
+    description: 'Comprehensive screening test evaluating red blood cells, white blood cells, platelets, and infection markers.',
+    price: 450,
+    sampleType: 'Blood',
+    fastingRequired: false,
+    turnaroundHours: 12,
+    dailyCapacity: 40,
+    isHomeSampleAvailable: true
+  },
+  {
+    _id: 'fallback-lip-01',
+    name: 'Comprehensive Lipid Profile',
+    category: 'Biochemistry',
+    code: 'LIP-01',
+    description: 'Measures total cholesterol, HDL, LDL, VLDL, and triglycerides for cardiovascular health risk assessment.',
+    price: 650,
+    sampleType: 'Blood',
+    fastingRequired: true,
+    turnaroundHours: 24,
+    dailyCapacity: 30,
+    isHomeSampleAvailable: true
+  },
+  {
+    _id: 'fallback-hba1c-01',
+    name: 'HbA1c (Glycosylated Hemoglobin)',
+    category: 'Biochemistry',
+    code: 'HBA1C-01',
+    description: 'Reflects average blood glucose control over the past 2 to 3 months. Essential for diabetes management.',
+    price: 500,
+    sampleType: 'Blood',
+    fastingRequired: false,
+    turnaroundHours: 12,
+    dailyCapacity: 35,
+    isHomeSampleAvailable: true
+  },
+  {
+    _id: 'fallback-lft-01',
+    name: 'Liver Function Test (LFT Profile)',
+    category: 'Biochemistry',
+    code: 'LFT-01',
+    description: 'Measures Bilirubin (Total/Direct), SGOT (AST), SGPT (ALT), Alkaline Phosphatase, and Total Protein.',
+    price: 700,
+    sampleType: 'Blood',
+    fastingRequired: true,
+    turnaroundHours: 18,
+    dailyCapacity: 25,
+    isHomeSampleAvailable: true
+  },
+  {
+    _id: 'fallback-kft-01',
+    name: 'Renal / Kidney Function Test (KFT)',
+    category: 'Biochemistry',
+    code: 'KFT-01',
+    description: 'Evaluates kidney performance via Blood Urea Nitrogen (BUN), Serum Creatinine, and Uric Acid.',
+    price: 600,
+    sampleType: 'Blood',
+    fastingRequired: false,
+    turnaroundHours: 12,
+    dailyCapacity: 30,
+    isHomeSampleAvailable: true
+  },
+  {
+    _id: 'fallback-thy-01',
+    name: 'Thyroid Stimulating Hormone (TSH) & Profile',
+    category: 'Biochemistry',
+    code: 'THY-01',
+    description: 'Assesses thyroid gland function measuring T3, T4, and TSH hormones.',
+    price: 550,
+    sampleType: 'Blood',
+    fastingRequired: true,
+    turnaroundHours: 24,
+    dailyCapacity: 35,
+    isHomeSampleAvailable: true
+  },
+  {
+    _id: 'fallback-xray-01',
+    name: 'Digital Chest X-Ray (PA View)',
+    category: 'Radiology',
+    code: 'XRAY-01',
+    description: 'Evaluates lungs, cardiac silhouette, mediastinum, pleura, and thoracic cage structure.',
+    price: 400,
+    sampleType: 'Digital Radiograph',
+    fastingRequired: false,
+    turnaroundHours: 4,
+    dailyCapacity: 50,
+    isHomeSampleAvailable: false
+  },
+  {
+    _id: 'fallback-mri-01',
+    name: 'MRI Brain (Plain + Contrast)',
+    category: 'Radiology',
+    code: 'MRI-01',
+    description: 'High-resolution magnetic resonance imaging of brain parenchyma, ventricles, and neurovasculature.',
+    price: 6500,
+    sampleType: 'Scan Imaging',
+    fastingRequired: false,
+    turnaroundHours: 24,
+    dailyCapacity: 10,
+    isHomeSampleAvailable: false
+  },
+  {
+    _id: 'fallback-ecg-01',
+    name: '12-Lead Resting Electrocardiogram (ECG)',
+    category: 'Cardiology',
+    code: 'ECG-01',
+    description: 'Records electrical activity of the heart to detect arrhythmias, ischemia, or prior myocardial infarction.',
+    price: 300,
+    sampleType: 'Electrical Trace',
+    fastingRequired: false,
+    turnaroundHours: 2,
+    dailyCapacity: 60,
+    isHomeSampleAvailable: true
+  },
+  {
+    _id: 'fallback-urine-01',
+    name: 'Urine Routine & Microscopic Examination',
+    category: 'Pathology',
+    code: 'URINE-01',
+    description: 'Physical, chemical, and microscopic examination for renal health, infection, and glycosuria.',
+    price: 250,
+    sampleType: 'Urine',
+    fastingRequired: false,
+    turnaroundHours: 6,
+    dailyCapacity: 50,
+    isHomeSampleAvailable: true
+  }
+];
+
 const categories = ['All', 'Pathology', 'Radiology', 'Cardiology', 'Biochemistry', 'Microbiology'];
 
 export const BookLabTestPage = ({ onNavigate }) => {
   const { user } = useAuth();
   const { t } = useLanguage();
 
-  const [tests, setTests] = useState([]);
+  const [tests, setTests] = useState(FALLBACK_LAB_TESTS);
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedTest, setSelectedTest] = useState(null);
+  const [selectedTest, setSelectedTest] = useState(FALLBACK_LAB_TESTS[0]);
 
   // Booking fields with smart date selection
   const todayStr = getTodayDateString();
@@ -126,12 +259,45 @@ export const BookLabTestPage = ({ onNavigate }) => {
         category: categoryFilter,
         search: searchTerm
       });
-      setTests(res.data.tests || []);
-      if (res.data.tests?.length > 0 && !selectedTest) {
-        setSelectedTest(res.data.tests[0]);
+      let fetched = res.data.tests || [];
+
+      // If backend returned 0 tests, attempt auto-seed endpoint
+      if (fetched.length === 0) {
+        try {
+          const seedRes = await labService.seedTests();
+          if (seedRes.data.tests?.length > 0) {
+            fetched = seedRes.data.tests;
+          }
+        } catch (sErr) {
+          console.warn('Seed endpoint note:', sErr.message);
+        }
+      }
+
+      // If still empty and no specific search, use fallback tests
+      if (fetched.length === 0 && (!searchTerm || searchTerm.trim() === '')) {
+        fetched = categoryFilter === 'All'
+          ? FALLBACK_LAB_TESTS
+          : FALLBACK_LAB_TESTS.filter(t => t.category === categoryFilter);
+      }
+
+      setTests(fetched);
+      if (fetched.length > 0) {
+        setSelectedTest(prev => {
+          if (prev && fetched.some(t => t.code === prev.code || t._id === prev._id)) {
+            return fetched.find(t => t.code === prev.code || t._id === prev._id);
+          }
+          return fetched[0];
+        });
       }
     } catch (err) {
-      console.error(err);
+      console.error('Error fetching lab tests:', err);
+      const fallbackFiltered = categoryFilter === 'All'
+        ? FALLBACK_LAB_TESTS
+        : FALLBACK_LAB_TESTS.filter(t => t.category === categoryFilter);
+      setTests(fallbackFiltered);
+      if (!selectedTest && fallbackFiltered.length > 0) {
+        setSelectedTest(fallbackFiltered[0]);
+      }
     } finally {
       setLoading(false);
     }
@@ -172,8 +338,12 @@ export const BookLabTestPage = ({ onNavigate }) => {
       const defaultDoctor = user?.role === 'doctor' ? `Dr. ${user.name}` : 'Self / OPD Physician';
       const selectedDoc = userAppointments.find(a => a._id === linkedApptId)?.doctorName || defaultDoctor;
 
+      const isFallbackId = !selectedTest._id || String(selectedTest._id).startsWith('fallback-');
+
       const res = await labService.bookTest({
-        labTestId: selectedTest._id,
+        labTestId: isFallbackId ? undefined : selectedTest._id,
+        testCode: selectedTest.code,
+        testName: selectedTest.name,
         bookingDate,
         slotTime,
         isHomeSampleCollection: isHomeCollection,
@@ -189,9 +359,11 @@ export const BookLabTestPage = ({ onNavigate }) => {
         origin: { y: 0.6 }
       });
     } catch (err) {
+      console.error('Booking error response:', err.response?.data);
       setError(err.response?.data?.message || 'Error booking lab test. Please try again.');
     }
   };
+
 
   return (
     <div className="max-w-5xl mx-auto py-6 space-y-6 pb-20 px-3 sm:px-4">
