@@ -31,6 +31,13 @@ import {
   Sparkles
 } from 'lucide-react';
 
+const ALL_DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const ALL_STANDARD_CONSULTATION_SLOTS = [
+  '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM',
+  '12:00 PM', '02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM', '04:00 PM',
+  '04:30 PM', '05:00 PM', '05:30 PM', '06:00 PM', '06:30 PM', '07:00 PM'
+];
+
 export const DoctorDashboard = () => {
   const { user } = useAuth();
   const { t } = useLanguage();
@@ -1615,137 +1622,308 @@ export const DoctorDashboard = () => {
         </div>
       )}
 
-      {/* Doctor OPD Schedule & Break Timings Customizer Modal */}
+      {/* Doctor OPD Schedule, Available Days & Free Days Customizer Modal */}
       {showScheduleModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-6 border-2 border-sky-400 space-y-4 animate-in zoom-in-95">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full p-6 border-2 border-sky-400 space-y-4 animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center border-b border-sky-100 pb-3">
               <div className="flex items-center gap-2 text-sky-950 font-bold text-base">
-                <Clock className="w-5 h-5 text-sky-600" />
-                <span>OPD Consultation Schedule & Break Customizer</span>
+                <Calendar className="w-5 h-5 text-sky-600" />
+                <span>My Weekly Schedule, Free Days & Daily Hours</span>
               </div>
               <button onClick={() => setShowScheduleModal(false)} className="text-slate-400 hover:text-slate-600">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
+            {/* Modal Tabs */}
+            <div className="flex border-b border-slate-200">
+              <button
+                type="button"
+                onClick={() => setScheduleActiveTab('weekly')}
+                className={`flex-1 py-2.5 text-xs font-bold border-b-2 transition flex items-center justify-center gap-1.5 ${
+                  scheduleActiveTab === 'weekly'
+                    ? 'border-sky-600 text-sky-600 bg-sky-50/50'
+                    : 'border-transparent text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                <Calendar className="w-4 h-4" />
+                <span>1. Weekly Working & Free Days</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setScheduleActiveTab('daily')}
+                className={`flex-1 py-2.5 text-xs font-bold border-b-2 transition flex items-center justify-center gap-1.5 ${
+                  scheduleActiveTab === 'daily'
+                    ? 'border-sky-600 text-sky-600 bg-sky-50/50'
+                    : 'border-transparent text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                <Clock className="w-4 h-4" />
+                <span>2. Daily Hours & Break Times</span>
+              </button>
+            </div>
+
             <form onSubmit={handleSaveSchedule} className="space-y-4 text-xs">
-              {/* Consultation Duration */}
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Standard Consultation Duration</label>
-                <div className="grid grid-cols-2 gap-3">
-                  {[15, 30].map(mins => (
-                    <button
-                      key={mins}
-                      type="button"
-                      onClick={() => setScheduleForm(prev => ({ ...prev, slotDurationMinutes: mins }))}
-                      className={`py-2 px-3 rounded-xl font-bold border transition text-center ${
-                        scheduleForm.slotDurationMinutes === mins
-                          ? 'bg-sky-600 text-white border-sky-600 shadow'
-                          : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                      }`}
-                    >
-                      {mins} Minutes / Patient
-                    </button>
-                  ))}
-                </div>
-              </div>
+              {/* TAB 1: WEEKLY WORKING & FREE DAYS */}
+              {scheduleActiveTab === 'weekly' && (
+                <div className="space-y-4 animate-in fade-in-50">
+                  <div className="bg-sky-50/70 border border-sky-200 rounded-2xl p-3.5 text-slate-700 space-y-1">
+                    <div className="font-bold text-sky-950 flex items-center gap-1.5">
+                      <span>Weekly Consultation Availability</span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 leading-relaxed">
+                      Select which days of the week you take outpatient consultations. Any unchecked day will be automatically registered as your <strong>Weekly Free / Off Day</strong> (patients will see you are off and cannot book appointments on those days).
+                    </p>
+                  </div>
 
-              {/* Break Reason */}
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Break Purpose / Notice for Patients</label>
-                <input
-                  type="text"
-                  required
-                  value={scheduleForm.breakReason}
-                  onChange={(e) => setScheduleForm(prev => ({ ...prev, breakReason: e.target.value }))}
-                  placeholder="e.g. Lunch & Inpatient Ward Rounds, Emergency OT Standby"
-                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-sky-500 font-medium"
-                />
-              </div>
-
-              {/* Quick Presets */}
-              <div>
-                <span className="block font-bold text-slate-700 mb-1.5">Quick Break Presets</span>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setScheduleForm(prev => ({
-                      ...prev,
-                      breakTimes: Array.from(new Set([...prev.breakTimes, '01:00 PM', '01:30 PM']))
-                    }))}
-                    className="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 font-semibold text-[11px] transition"
-                  >
-                    + Lunch (01:00 PM - 02:00 PM)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setScheduleForm(prev => ({
-                      ...prev,
-                      breakTimes: Array.from(new Set([...prev.breakTimes, '04:00 PM']))
-                    }))}
-                    className="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 font-semibold text-[11px] transition"
-                  >
-                    + Evening Break (04:00 PM)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setScheduleForm(prev => ({ ...prev, breakTimes: [] }))}
-                    className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200 font-semibold text-[11px] transition"
-                  >
-                    Clear All Breaks
-                  </button>
-                </div>
-              </div>
-
-              {/* Individual Slot Break Toggles */}
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">
-                  Click slots to toggle between Consulting & Reserved Break:
-                </label>
-                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-48 overflow-y-auto p-1">
-                  {scheduleForm.slotTimes.map(slot => {
-                    const isBreak = scheduleForm.breakTimes.includes(slot);
-                    return (
+                  {/* Quick Day Presets */}
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1.5">Quick Day Presets:</label>
+                    <div className="flex flex-wrap gap-2">
                       <button
-                        key={slot}
                         type="button"
-                        onClick={() => handleToggleBreakSlot(slot)}
-                        className={`p-2 rounded-xl border text-center transition font-semibold text-[11px] ${
-                          isBreak
-                            ? 'bg-amber-50 border-amber-300 text-amber-900 shadow-xs'
-                            : 'bg-emerald-50 border-emerald-300 text-emerald-900 hover:bg-emerald-100'
-                        }`}
+                        onClick={() => handleSetDaysPreset('weekdays')}
+                        className="px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-xs transition"
                       >
-                        <div className="font-bold">{slot}</div>
-                        <div className="text-[9px] mt-0.5">
-                          {isBreak ? '☕ On Break' : '🩺 Consulting'}
-                        </div>
+                        Mon – Fri (Sat & Sun Free)
                       </button>
-                    );
-                  })}
-                </div>
-                <span className="text-[10px] text-slate-400 mt-1 block">
-                  Reserved break slots are dynamically blocked on the patient booking calendar.
-                </span>
-              </div>
+                      <button
+                        type="button"
+                        onClick={() => handleSetDaysPreset('mon_sat')}
+                        className="px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-xs transition"
+                      >
+                        Mon – Sat (Sun Free)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSetDaysPreset('all')}
+                        className="px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-xs transition"
+                      >
+                        All 7 Days Active
+                      </button>
+                    </div>
+                  </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setShowScheduleModal(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submittingSchedule}
-                  className="px-5 py-2.5 rounded-xl text-xs font-bold bg-sky-600 hover:bg-sky-500 text-white shadow-md transition flex items-center gap-1.5"
-                >
-                  <Clock className="w-4 h-4" />
-                  <span>{submittingSchedule ? 'Saving Schedule...' : 'Save & Apply Schedule'}</span>
-                </button>
+                  {/* 7 Day Selector Cards */}
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-2">
+                      Click days to toggle between Consulting and Free Day:
+                    </label>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+                      {ALL_DAYS_OF_WEEK.map(day => {
+                        const isAvailable = scheduleForm.availableDays.includes(day);
+                        return (
+                          <div
+                            key={day}
+                            onClick={() => handleToggleDay(day)}
+                            className={`p-3 rounded-2xl border-2 transition cursor-pointer flex flex-col justify-between gap-2 ${
+                              isAvailable
+                                ? 'bg-emerald-50/80 border-emerald-400 shadow-xs'
+                                : 'bg-amber-50/70 border-amber-300'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-extrabold text-slate-900 text-sm">{day}</span>
+                              <span className="text-base">{isAvailable ? '🩺' : '🏖️'}</span>
+                            </div>
+                            <div>
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full inline-block ${
+                                isAvailable
+                                  ? 'bg-emerald-200/70 text-emerald-900'
+                                  : 'bg-amber-200/70 text-amber-900'
+                              }`}>
+                                {isAvailable ? 'Consulting Day' : 'Weekly Free Day'}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Weekly Live Summary */}
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-1.5">
+                    <div className="flex items-center justify-between text-xs font-bold text-slate-800">
+                      <span>Schedule Breakdown:</span>
+                      <span className="text-sky-700">{scheduleForm.availableDays.length} Working / {7 - scheduleForm.availableDays.length} Free</span>
+                    </div>
+                    <div className="text-[11px] text-slate-600 space-y-1">
+                      <div>
+                        <strong className="text-emerald-700">🩺 Active Consultation Days: </strong>
+                        <span>{scheduleForm.availableDays.join(', ')}</span>
+                      </div>
+                      <div>
+                        <strong className="text-amber-800">🏖️ Weekly Free / Off Days: </strong>
+                        <span>
+                          {ALL_DAYS_OF_WEEK.filter(d => !scheduleForm.availableDays.includes(d)).length > 0
+                            ? ALL_DAYS_OF_WEEK.filter(d => !scheduleForm.availableDays.includes(d)).join(', ')
+                            : 'None (Available 7 days/week)'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 2: DAILY HOURS & BREAK TIMES */}
+              {scheduleActiveTab === 'daily' && (
+                <div className="space-y-4 animate-in fade-in-50">
+                  {/* Daily Shift Presets */}
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1.5">Daily Shift Presets:</label>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleSetSlotsPreset('full_day')}
+                        className="px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-xs transition"
+                      >
+                        Full Day (09:00 AM – 07:00 PM)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSetSlotsPreset('morning')}
+                        className="px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-xs transition"
+                      >
+                        Morning Only (09:00 AM – 12:00 PM)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSetSlotsPreset('afternoon')}
+                        className="px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-xs transition"
+                      >
+                        Afternoon (02:00 PM – 05:00 PM)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSetSlotsPreset('evening')}
+                        className="px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-xs transition"
+                      >
+                        Evening (04:00 PM – 07:00 PM)
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Consultation Duration */}
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Standard Consultation Duration</label>
+                    <div className="grid grid-cols-2 gap-3">
+                      {[15, 30].map(mins => (
+                        <button
+                          key={mins}
+                          type="button"
+                          onClick={() => setScheduleForm(prev => ({ ...prev, slotDurationMinutes: mins }))}
+                          className={`py-2 px-3 rounded-xl font-bold border transition text-center ${
+                            scheduleForm.slotDurationMinutes === mins
+                              ? 'bg-sky-600 text-white border-sky-600 shadow'
+                              : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                          }`}
+                        >
+                          {mins} Minutes / Patient
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Interactive Daily Slots Grid */}
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="font-bold text-slate-700">
+                        Daily Consultation Slots ({scheduleForm.slotTimes.length} Active Slots)
+                      </label>
+                      <span className="text-[10px] text-slate-400">Click to include/exclude from daily schedule</span>
+                    </div>
+                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 max-h-48 overflow-y-auto p-1 border border-slate-200 rounded-2xl bg-slate-50/50">
+                      {ALL_STANDARD_CONSULTATION_SLOTS.map(slot => {
+                        const isActive = scheduleForm.slotTimes.includes(slot);
+                        const isBreak = scheduleForm.breakTimes.includes(slot);
+                        return (
+                          <div
+                            key={slot}
+                            className={`p-2 rounded-xl border text-center transition flex flex-col justify-between gap-1 ${
+                              !isActive
+                                ? 'bg-slate-100 border-slate-200 text-slate-400 opacity-60'
+                                : isBreak
+                                ? 'bg-amber-50 border-amber-300 text-amber-900 shadow-xs'
+                                : 'bg-emerald-50 border-emerald-400 text-emerald-900 shadow-xs'
+                            }`}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => handleToggleSlotActive(slot)}
+                              className="font-bold text-xs"
+                            >
+                              {slot}
+                            </button>
+                            <div className="flex items-center justify-center gap-1">
+                              {isActive ? (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleToggleBreakSlot(slot);
+                                  }}
+                                  title="Toggle Break status"
+                                  className={`text-[9px] font-bold px-1.5 py-0.5 rounded transition ${
+                                    isBreak
+                                      ? 'bg-amber-200 text-amber-950 font-extrabold'
+                                      : 'bg-emerald-200 text-emerald-900 hover:bg-amber-100'
+                                  }`}
+                                >
+                                  {isBreak ? '☕ Break' : '🩺 Active'}
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleSlotActive(slot)}
+                                  className="text-[9px] text-slate-500 font-semibold hover:text-sky-600"
+                                >
+                                  + Enable
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Break Reason & Notice */}
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Scheduled Break Purpose / Notice</label>
+                    <input
+                      type="text"
+                      required
+                      value={scheduleForm.breakReason}
+                      onChange={(e) => setScheduleForm(prev => ({ ...prev, breakReason: e.target.value }))}
+                      placeholder="e.g. Lunch & Inpatient Ward Rounds, Emergency OT Standby"
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-sky-500 font-medium"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-between items-center pt-3 border-t border-slate-100">
+                <span className="text-[11px] text-slate-400">
+                  All updates take effect immediately on patient booking portal.
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowScheduleModal(false)}
+                    className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submittingSchedule}
+                    className="px-5 py-2.5 rounded-xl text-xs font-bold bg-sky-600 hover:bg-sky-500 text-white shadow-md transition flex items-center gap-1.5"
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>{submittingSchedule ? 'Saving Schedule...' : 'Save Availability & Hours'}</span>
+                  </button>
+                </div>
               </div>
             </form>
           </div>

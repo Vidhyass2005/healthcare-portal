@@ -116,6 +116,27 @@ exports.bookAppointment = async (req, res, next) => {
       });
     }
 
+    // Check if appointment day is a Weekly Free / Off Day for the doctor
+    const daysOfWeekList = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const [yNum, mNum, dNum] = appointmentDate.split('-').map(Number);
+    const bookingDayOfWeek = daysOfWeekList[new Date(yNum, mNum - 1, dNum).getDay()];
+    const docAvailableDays = doctor.doctorProfile?.availableDays;
+    if (Array.isArray(docAvailableDays) && docAvailableDays.length > 0 && !docAvailableDays.includes(bookingDayOfWeek)) {
+      return res.status(400).json({
+        success: false,
+        message: `Dr. ${doctor.name} is on weekly off / free on ${bookingDayOfWeek}s. Active consulting days: ${docAvailableDays.join(', ')}.`
+      });
+    }
+
+    // Check if slot falls within doctor's configured daily hours
+    const docConfiguredSlots = doctor.doctorProfile?.slotTimes;
+    if (Array.isArray(docConfiguredSlots) && docConfiguredSlots.length > 0 && !docConfiguredSlots.includes(slotTime)) {
+      return res.status(400).json({
+        success: false,
+        message: `The selected time (${slotTime}) is not within Dr. ${doctor.name}'s daily consultation hours.`
+      });
+    }
+
     // Check if slot falls on doctor's scheduled break
     const doctorBreaks = doctor.doctorProfile?.breakTimes || [];
     if (doctorBreaks.includes(slotTime)) {
@@ -339,6 +360,13 @@ exports.getDoctorSlots = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Doctor not found' });
     }
 
+    const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const [yearNum, monthNum, dayNum] = date.split('-').map(Number);
+    const dayOfWeek = daysOfWeek[new Date(yearNum, monthNum - 1, dayNum).getDay()];
+    const availableDays = doctor.doctorProfile?.availableDays || [
+      'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
+    ];
+
     const todayStr = getLocalDateString();
     if (date < todayStr) {
       return res.status(200).json({
@@ -346,6 +374,7 @@ exports.getDoctorSlots = async (req, res, next) => {
         doctorId,
         doctorName: doctor.name,
         date,
+        dayOfWeek,
         isPastDate: true,
         message: 'Cannot view or book slots for past dates. Please choose today or a future date.',
         slots: []
@@ -359,8 +388,24 @@ exports.getDoctorSlots = async (req, res, next) => {
         doctorId,
         doctorName: doctor.name,
         date,
+        dayOfWeek,
         isOnLeave: true,
         message: `Dr. ${doctor.name} is currently On Leave for this period. Appointments are temporarily paused.`,
+        slots: []
+      });
+    }
+
+    // Check if requested date is a doctor's weekly off / free day
+    if (Array.isArray(availableDays) && availableDays.length > 0 && !availableDays.includes(dayOfWeek)) {
+      return res.status(200).json({
+        success: true,
+        doctorId,
+        doctorName: doctor.name,
+        date,
+        dayOfWeek,
+        isDoctorOffDay: true,
+        availableDays,
+        message: `Dr. ${doctor.name} is on weekly off / free on ${dayOfWeek}s. Consultations are available on: ${availableDays.join(', ')}.`,
         slots: []
       });
     }
@@ -371,7 +416,7 @@ exports.getDoctorSlots = async (req, res, next) => {
       '04:30 PM', '05:00 PM', '05:30 PM', '06:00 PM', '06:30 PM', '07:00 PM'
     ];
     const rawSlots = doctor.doctorProfile?.slotTimes;
-    const allSlots = (Array.isArray(rawSlots) && rawSlots.length >= 12)
+    const allSlots = (Array.isArray(rawSlots) && rawSlots.length > 0)
       ? rawSlots
       : DEFAULT_CONSULTATION_SLOTS;
     const breakTimes = doctor.doctorProfile?.breakTimes || [];

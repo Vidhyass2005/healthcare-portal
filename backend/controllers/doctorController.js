@@ -56,6 +56,7 @@ exports.getDoctorDashboardSummary = async (req, res, next) => {
         currentInConsultation: inProgressAppt || null,
         availabilityStatus: doctorUser.doctorProfile?.availabilityStatus || 'Available'
       },
+      doctorProfile: doctorUser.doctorProfile,
       todayQueue: todayAppointments,
       referredQueue
     });
@@ -328,7 +329,7 @@ exports.updatePatientAlerts = async (req, res, next) => {
 exports.updateScheduleSettings = async (req, res, next) => {
   try {
     const doctorId = req.user.id;
-    const { slotTimes, breakTimes, breakReason, slotDurationMinutes } = req.body;
+    const { availableDays, slotTimes, breakTimes, breakReason, slotDurationMinutes } = req.body;
 
     const doctor = await User.findById(doctorId);
     if (!doctor || doctor.role !== 'doctor') {
@@ -337,6 +338,9 @@ exports.updateScheduleSettings = async (req, res, next) => {
 
     if (!doctor.doctorProfile) doctor.doctorProfile = {};
 
+    if (availableDays && Array.isArray(availableDays)) {
+      doctor.doctorProfile.availableDays = availableDays;
+    }
     if (slotTimes && Array.isArray(slotTimes) && slotTimes.length > 0) {
       doctor.doctorProfile.slotTimes = slotTimes;
     }
@@ -349,12 +353,14 @@ exports.updateScheduleSettings = async (req, res, next) => {
     if (slotDurationMinutes !== undefined) {
       doctor.doctorProfile.slotDurationMinutes = Number(slotDurationMinutes) || 30;
     }
+    doctor.doctorProfile.hasCustomSchedule = true;
 
+    doctor.markModified('doctorProfile');
     await doctor.save();
 
     res.status(200).json({
       success: true,
-      message: 'OPD consultation schedule & break timings updated successfully.',
+      message: 'Weekly schedule, free days, and daily consultation hours saved successfully.',
       doctorProfile: doctor.doctorProfile
     });
   } catch (error) {

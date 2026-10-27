@@ -73,6 +73,26 @@ export const BookAppointmentPage = ({ onNavigate }) => {
   const [availableSlots, setAvailableSlots] = useState([]);
   const [selectedSlot, setSelectedSlot] = useState('');
   const [loadingSlots, setLoadingSlots] = useState(false);
+  const [doctorOffDayInfo, setDoctorOffDayInfo] = useState(null);
+
+  const handleJumpToNextAvailableDay = (availableDaysList) => {
+    if (!availableDaysList || availableDaysList.length === 0) return;
+    const daysOfWeekNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const [y, m, d] = selectedDate.split('-').map(Number);
+    const curDate = new Date(y, m - 1, d);
+    for (let i = 1; i <= 7; i++) {
+      const nextDate = new Date(curDate);
+      nextDate.setDate(curDate.getDate() + i);
+      const dayName = daysOfWeekNames[nextDate.getDay()];
+      if (availableDaysList.includes(dayName)) {
+        const nextY = nextDate.getFullYear();
+        const nextM = String(nextDate.getMonth() + 1).padStart(2, '0');
+        const nextD = String(nextDate.getDate()).padStart(2, '0');
+        setSelectedDate(`${nextY}-${nextM}-${nextD}`);
+        break;
+      }
+    }
+  };
 
   const todayStr = getOffsetDateString(0);
   const tomorrowStr = getOffsetDateString(1);
@@ -303,6 +323,18 @@ export const BookAppointmentPage = ({ onNavigate }) => {
                       <div className="text-[11px] text-slate-500 mt-0.5">
                         {doc.doctorProfile?.experienceYears || '10'}+ Yrs Exp • Room: {doc.doctorProfile?.roomNumber || 'OPD-101'}
                       </div>
+                      {doc.doctorProfile?.availableDays && (
+                        <div className="text-[10px] text-slate-500 mt-1 flex flex-wrap items-center gap-1">
+                          <span className="bg-sky-50 text-sky-700 font-semibold px-2 py-0.5 rounded border border-sky-100">
+                            📅 {doc.doctorProfile.availableDays.length === 7 ? 'Every Day' : doc.doctorProfile.availableDays.join(', ')}
+                          </span>
+                          {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].filter(d => !doc.doctorProfile.availableDays.includes(d)).length > 0 && (
+                            <span className="bg-amber-50 text-amber-800 font-semibold px-2 py-0.5 rounded border border-amber-200">
+                              🏖️ Off: {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].filter(d => !doc.doctorProfile.availableDays.includes(d)).join(', ')}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -379,6 +411,31 @@ export const BookAppointmentPage = ({ onNavigate }) => {
             ) : isPastDate ? (
               <div className="text-center p-6 text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-2xl">
                 Cannot book appointments on past dates. Please select today or a future date.
+              </div>
+            ) : doctorOffDayInfo?.isOffDay ? (
+              <div className="text-center p-6 text-xs text-amber-900 bg-amber-50/90 border border-amber-300 rounded-2xl space-y-3 shadow-xs">
+                <div className="w-10 h-10 mx-auto rounded-2xl bg-amber-200 text-amber-900 flex items-center justify-center text-xl">
+                  🏖️
+                </div>
+                <div className="font-extrabold text-sm text-amber-950">
+                  Weekly Free / Off Day for {selectedDoctor?.name}
+                </div>
+                <p className="text-xs text-amber-800 max-w-md mx-auto leading-relaxed">
+                  Dr. {selectedDoctor?.name} is on weekly off / free on <strong>{doctorOffDayInfo.dayOfWeek}s</strong> and is not available for consultations.
+                </p>
+                <div className="text-[11px] text-amber-800 bg-amber-100/70 py-1.5 px-3 rounded-xl inline-block border border-amber-200/60 font-semibold">
+                  Active Consulting Days: <span className="font-bold text-emerald-800">{doctorOffDayInfo.availableDays?.join(', ')}</span>
+                </div>
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={() => handleJumpToNextAvailableDay(doctorOffDayInfo.availableDays)}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold transition shadow-xs"
+                  >
+                    <Calendar className="w-3.5 h-3.5" />
+                    <span>Switch to Next Consulting Day</span>
+                  </button>
+                </div>
               </div>
             ) : visibleSlots.length === 0 ? (
               <div className="text-center p-6 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-2xl space-y-3">
