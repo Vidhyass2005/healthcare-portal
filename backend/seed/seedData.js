@@ -36,6 +36,13 @@ const seedDatabase = async () => {
     });
 
     // 2. Create Doctors
+    const ALL_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const DEFAULT_CONSULTATION_SLOTS = [
+      '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM',
+      '12:00 PM', '02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM', '04:00 PM',
+      '04:30 PM', '05:00 PM', '05:30 PM', '06:00 PM', '06:30 PM', '07:00 PM'
+    ];
+
     const doctorsData = [
       {
         name: 'Dr. Priya Sharma',
@@ -53,8 +60,8 @@ const seedDatabase = async () => {
           consultationFee: 800,
           roomNumber: 'OPD-Cardio-102',
           availabilityStatus: 'Available',
-          availableDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
-          slotTimes: ['09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM', '02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM']
+          availableDays: ALL_DAYS,
+          slotTimes: DEFAULT_CONSULTATION_SLOTS
         }
       },
       {
@@ -73,8 +80,8 @@ const seedDatabase = async () => {
           consultationFee: 750,
           roomNumber: 'OPD-Ortho-105',
           availabilityStatus: 'Available',
-          availableDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Saturday'],
-          slotTimes: ['09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM', '02:00 PM', '02:30 PM', '03:00 PM']
+          availableDays: ALL_DAYS,
+          slotTimes: DEFAULT_CONSULTATION_SLOTS
         }
       },
       {
@@ -93,8 +100,8 @@ const seedDatabase = async () => {
           consultationFee: 900,
           roomNumber: 'OPD-Neuro-201',
           availabilityStatus: 'Available',
-          availableDays: ['Monday', 'Wednesday', 'Thursday', 'Friday'],
-          slotTimes: ['09:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM', '02:30 PM', '03:00 PM', '03:30 PM']
+          availableDays: ALL_DAYS,
+          slotTimes: DEFAULT_CONSULTATION_SLOTS
         }
       },
       {
@@ -113,8 +120,8 @@ const seedDatabase = async () => {
           consultationFee: 500,
           roomNumber: 'OPD-GenMed-101',
           availabilityStatus: 'Available',
-          availableDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
-          slotTimes: ['09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM', '02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM', '04:00 PM']
+          availableDays: ALL_DAYS,
+          slotTimes: DEFAULT_CONSULTATION_SLOTS
         }
       },
       {
@@ -133,8 +140,68 @@ const seedDatabase = async () => {
           consultationFee: 600,
           roomNumber: 'OPD-Pedia-108',
           availabilityStatus: 'Available',
-          availableDays: ['Monday', 'Tuesday', 'Wednesday', 'Friday', 'Saturday'],
-          slotTimes: ['09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '02:00 PM', '02:30 PM']
+          availableDays: ALL_DAYS,
+          slotTimes: DEFAULT_CONSULTATION_SLOTS
+        }
+      },
+      {
+        name: 'Dr. Kavitha Balan',
+        email: 'kavitha.derma@hospital.com',
+        password: 'Doctor@123',
+        role: 'doctor',
+        phone: '+91 98407 88990',
+        age: 41,
+        gender: 'Female',
+        city: 'Chennai',
+        doctorProfile: {
+          department: 'Dermatology',
+          specialization: 'Consultant Dermatologist & Cosmetologist',
+          experienceYears: 13,
+          consultationFee: 650,
+          roomNumber: 'OPD-Derma-112',
+          availabilityStatus: 'Available',
+          availableDays: ALL_DAYS,
+          slotTimes: DEFAULT_CONSULTATION_SLOTS
+        }
+      },
+      {
+        name: 'Dr. Arvind Swamy',
+        email: 'arvind.ent@hospital.com',
+        password: 'Doctor@123',
+        role: 'doctor',
+        phone: '+91 98408 99001',
+        age: 44,
+        gender: 'Male',
+        city: 'Chennai',
+        doctorProfile: {
+          department: 'ENT',
+          specialization: 'Head, Neck & ENT Surgeon',
+          experienceYears: 16,
+          consultationFee: 700,
+          roomNumber: 'OPD-ENT-115',
+          availabilityStatus: 'Available',
+          availableDays: ALL_DAYS,
+          slotTimes: DEFAULT_CONSULTATION_SLOTS
+        }
+      },
+      {
+        name: 'Dr. Meenakshi Sundaram',
+        email: 'meenakshi.onco@hospital.com',
+        password: 'Doctor@123',
+        role: 'doctor',
+        phone: '+91 98409 00112',
+        age: 48,
+        gender: 'Female',
+        city: 'Chennai',
+        doctorProfile: {
+          department: 'Oncology',
+          specialization: 'Medical Oncologist & Cancer Care Specialist',
+          experienceYears: 19,
+          consultationFee: 1000,
+          roomNumber: 'OPD-Onco-301',
+          availabilityStatus: 'Available',
+          availableDays: ALL_DAYS,
+          slotTimes: DEFAULT_CONSULTATION_SLOTS
         }
       }
     ];

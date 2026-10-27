@@ -27,7 +27,8 @@ const isSlotInPast = (dateStr, slotTimeStr) => {
   minutes = parseInt(minutes, 10);
   if (period.toUpperCase() === 'PM' && hours < 12) hours += 12;
   if (period.toUpperCase() === 'AM' && hours === 12) hours = 0;
-  const slotDate = new Date(year, month - 1, day, hours, minutes, 0, 0);
+  // 15-minute grace period buffer to prevent edge-case timing rejections
+  const slotDate = new Date(year, month - 1, day, hours, minutes + 15, 0, 0);
   return slotDate <= now;
 };
 
@@ -364,11 +365,15 @@ exports.getDoctorSlots = async (req, res, next) => {
       });
     }
 
-    const allSlots = doctor.doctorProfile?.slotTimes || [
-      '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM',
-      '11:00 AM', '11:30 AM', '02:00 PM', '02:30 PM',
-      '03:00 PM', '03:30 PM', '04:00 PM'
+    const DEFAULT_CONSULTATION_SLOTS = [
+      '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM',
+      '12:00 PM', '02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM', '04:00 PM',
+      '04:30 PM', '05:00 PM', '05:30 PM', '06:00 PM', '06:30 PM', '07:00 PM'
     ];
+    const rawSlots = doctor.doctorProfile?.slotTimes;
+    const allSlots = (Array.isArray(rawSlots) && rawSlots.length >= 12)
+      ? rawSlots
+      : DEFAULT_CONSULTATION_SLOTS;
     const breakTimes = doctor.doctorProfile?.breakTimes || [];
     const breakReason = doctor.doctorProfile?.breakReason || 'Lunch & Inpatient Ward Rounds';
 

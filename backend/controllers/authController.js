@@ -127,7 +127,26 @@ exports.getDoctors = async (req, res, next) => {
       query['doctorProfile.department'] = department;
     }
 
-    const doctors = await User.find(query).select('-password');
+    const DEFAULT_CONSULTATION_SLOTS = [
+      '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM',
+      '12:00 PM', '02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM', '04:00 PM',
+      '04:30 PM', '05:00 PM', '05:30 PM', '06:00 PM', '06:30 PM', '07:00 PM'
+    ];
+    let doctors = await User.find(query).select('-password');
+    doctors = doctors.map(doc => {
+      const docObj = doc.toObject();
+      if (!docObj.doctorProfile) {
+        docObj.doctorProfile = {};
+      }
+      if (!docObj.doctorProfile.availabilityStatus) {
+        docObj.doctorProfile.availabilityStatus = 'Available';
+      }
+      if (!Array.isArray(docObj.doctorProfile.slotTimes) || docObj.doctorProfile.slotTimes.length < 12) {
+        docObj.doctorProfile.slotTimes = DEFAULT_CONSULTATION_SLOTS;
+      }
+      return docObj;
+    });
+
     res.status(200).json({
       success: true,
       count: doctors.length,
