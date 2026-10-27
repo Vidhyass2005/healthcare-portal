@@ -115,17 +115,19 @@ export const DoctorDashboard = () => {
     followUpInstructions: '7-day clinical review and response to medication'
   });
 
-  // Doctor OPD Schedule & Break Settings
+  // Doctor OPD Schedule, Available Days & Free Days Settings
   const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [scheduleActiveTab, setScheduleActiveTab] = useState('weekly'); // 'weekly' | 'daily'
   const [scheduleForm, setScheduleForm] = useState({
     slotDurationMinutes: user?.doctorProfile?.slotDurationMinutes || 30,
     breakReason: user?.doctorProfile?.breakReason || 'Lunch & Inpatient Ward Rounds',
     breakTimes: user?.doctorProfile?.breakTimes || ['01:00 PM', '01:30 PM'],
-    slotTimes: user?.doctorProfile?.slotTimes || [
-      '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM',
-      '11:00 AM', '11:30 AM', '02:00 PM', '02:30 PM',
-      '03:00 PM', '03:30 PM', '04:00 PM'
-    ]
+    availableDays: (Array.isArray(user?.doctorProfile?.availableDays) && user.doctorProfile.availableDays.length > 0)
+      ? user.doctorProfile.availableDays
+      : ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+    slotTimes: (Array.isArray(user?.doctorProfile?.slotTimes) && user.doctorProfile.slotTimes.length > 0)
+      ? user.doctorProfile.slotTimes
+      : ALL_STANDARD_CONSULTATION_SLOTS
   });
   const [submittingSchedule, setSubmittingSchedule] = useState(false);
 
@@ -162,6 +164,20 @@ export const DoctorDashboard = () => {
       setMetrics(res.data.metrics || {});
       setTodayQueue(res.data.todayQueue || []);
       setReferredQueue(res.data.referredQueue || []);
+      if (res.data.doctorProfile) {
+        setScheduleForm(prev => ({
+          ...prev,
+          slotDurationMinutes: res.data.doctorProfile.slotDurationMinutes || 30,
+          breakReason: res.data.doctorProfile.breakReason || 'Lunch & Inpatient Ward Rounds',
+          breakTimes: res.data.doctorProfile.breakTimes || ['01:00 PM', '01:30 PM'],
+          availableDays: (Array.isArray(res.data.doctorProfile.availableDays) && res.data.doctorProfile.availableDays.length > 0)
+            ? res.data.doctorProfile.availableDays
+            : ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+          slotTimes: (Array.isArray(res.data.doctorProfile.slotTimes) && res.data.doctorProfile.slotTimes.length > 0)
+            ? res.data.doctorProfile.slotTimes
+            : ALL_STANDARD_CONSULTATION_SLOTS
+        }));
+      }
     } catch (err) {
       console.error('Error fetching doctor dashboard:', err);
     } finally {
@@ -237,28 +253,123 @@ export const DoctorDashboard = () => {
     }
   };
 
+  // Toggle working day vs. weekly free day
+  const handleToggleDay = (day) => {
+    setScheduleForm(prev => {
+      const currentDays = prev.availableDays || [];
+      const isAvailable = currentDays.includes(day);
+      if (isAvailable && currentDays.length === 1) {
+        alert('You must have at least one consulting day active in the week.');
+        return prev;
+      }
+      const newDays = isAvailable
+        ? currentDays.filter(d => d !== day)
+        : [...currentDays, day];
+      return { ...prev, availableDays: newDays };
+    });
+  };
+
+  const handleSetDaysPreset = (preset) => {
+    if (preset === 'weekdays') {
+      setScheduleForm(prev => ({
+        ...prev,
+        availableDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
+      }));
+    } else if (preset === 'mon_sat') {
+      setScheduleForm(prev => ({
+        ...prev,
+        availableDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+      }));
+    } else if (preset === 'all') {
+      setScheduleForm(prev => ({
+        ...prev,
+        availableDays: [...ALL_DAYS_OF_WEEK]
+      }));
+    }
+  };
+
+  const handleToggleSlotActive = (slot) => {
+    setScheduleForm(prev => {
+      const currentSlots = prev.slotTimes || [];
+      const isSlotActive = currentSlots.includes(slot);
+      if (isSlotActive && currentSlots.length === 1) {
+        alert('You must have at least one active daily consultation slot.');
+        return prev;
+      }
+      const newSlots = isSlotActive
+        ? currentSlots.filter(s => s !== slot)
+        : [...currentSlots, slot].sort((a, b) => ALL_STANDARD_CONSULTATION_SLOTS.indexOf(a) - ALL_STANDARD_CONSULTATION_SLOTS.indexOf(b));
+
+      const newBreaks = isSlotActive
+        ? (prev.breakTimes || []).filter(s => s !== slot)
+        : (prev.breakTimes || []);
+
+      return { ...prev, slotTimes: newSlots, breakTimes: newBreaks };
+    });
+  };
+
+  const handleSetSlotsPreset = (preset) => {
+    if (preset === 'full_day') {
+      setScheduleForm(prev => ({
+        ...prev,
+        slotTimes: [...ALL_STANDARD_CONSULTATION_SLOTS]
+      }));
+    } else if (preset === 'morning') {
+      const morningSlots = ['09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM', '12:00 PM'];
+      setScheduleForm(prev => ({
+        ...prev,
+        slotTimes: morningSlots,
+        breakTimes: (prev.breakTimes || []).filter(s => morningSlots.includes(s))
+      }));
+    } else if (preset === 'afternoon') {
+      const afternoonSlots = ['02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM', '04:00 PM', '04:30 PM', '05:00 PM'];
+      setScheduleForm(prev => ({
+        ...prev,
+        slotTimes: afternoonSlots,
+        breakTimes: (prev.breakTimes || []).filter(s => afternoonSlots.includes(s))
+      }));
+    } else if (preset === 'evening') {
+      const eveningSlots = ['04:00 PM', '04:30 PM', '05:00 PM', '05:30 PM', '06:00 PM', '06:30 PM', '07:00 PM'];
+      setScheduleForm(prev => ({
+        ...prev,
+        slotTimes: eveningSlots,
+        breakTimes: (prev.breakTimes || []).filter(s => eveningSlots.includes(s))
+      }));
+    }
+  };
+
   const handleToggleBreakSlot = (slot) => {
     setScheduleForm(prev => {
-      const isAlreadyBreak = prev.breakTimes.includes(slot);
+      const currentBreaks = prev.breakTimes || [];
+      const isAlreadyBreak = currentBreaks.includes(slot);
       const newBreaks = isAlreadyBreak
-        ? prev.breakTimes.filter(s => s !== slot)
-        : [...prev.breakTimes, slot];
+        ? currentBreaks.filter(s => s !== slot)
+        : [...currentBreaks, slot];
       return { ...prev, breakTimes: newBreaks };
     });
   };
 
   const handleSaveSchedule = async (e) => {
     e.preventDefault();
+    if (!scheduleForm.availableDays || scheduleForm.availableDays.length === 0) {
+      alert('Please select at least one weekly consulting day.');
+      return;
+    }
+    if (!scheduleForm.slotTimes || scheduleForm.slotTimes.length === 0) {
+      alert('Please select at least one daily consultation time slot.');
+      return;
+    }
     try {
       setSubmittingSchedule(true);
       await doctorService.updateScheduleSettings({
-        slotDurationMinutes: scheduleForm.slotDurationMinutes,
+        availableDays: scheduleForm.availableDays,
+        slotTimes: scheduleForm.slotTimes,
+        breakTimes: scheduleForm.breakTimes || [],
         breakReason: scheduleForm.breakReason,
-        breakTimes: scheduleForm.breakTimes,
-        slotTimes: scheduleForm.slotTimes
+        slotDurationMinutes: scheduleForm.slotDurationMinutes
       });
       setShowScheduleModal(false);
-      alert('OPD consultation schedule & break timings updated successfully!');
+      alert('Weekly schedule, free days, and daily consultation hours saved successfully!');
       fetchDoctorData();
     } catch (err) {
       alert(err.response?.data?.message || 'Error updating schedule settings');
@@ -1623,312 +1734,315 @@ export const DoctorDashboard = () => {
       )}
 
       {/* Doctor OPD Schedule, Available Days & Free Days Customizer Modal */}
-      {showScheduleModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full p-6 border-2 border-sky-400 space-y-4 animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center border-b border-sky-100 pb-3">
-              <div className="flex items-center gap-2 text-sky-950 font-bold text-base">
-                <Calendar className="w-5 h-5 text-sky-600" />
-                <span>My Weekly Schedule, Free Days & Daily Hours</span>
-              </div>
-              <button onClick={() => setShowScheduleModal(false)} className="text-slate-400 hover:text-slate-600">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+      {showScheduleModal && (() => {
+        const activeDays = scheduleForm.availableDays || [];
+        const activeSlots = scheduleForm.slotTimes || [];
+        const currentBreaks = scheduleForm.breakTimes || [];
+        const freeDays = ALL_DAYS_OF_WEEK.filter(d => !activeDays.includes(d));
 
-            {/* Modal Tabs */}
-            <div className="flex border-b border-slate-200">
-              <button
-                type="button"
-                onClick={() => setScheduleActiveTab('weekly')}
-                className={`flex-1 py-2.5 text-xs font-bold border-b-2 transition flex items-center justify-center gap-1.5 ${
-                  scheduleActiveTab === 'weekly'
-                    ? 'border-sky-600 text-sky-600 bg-sky-50/50'
-                    : 'border-transparent text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                <Calendar className="w-4 h-4" />
-                <span>1. Weekly Working & Free Days</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setScheduleActiveTab('daily')}
-                className={`flex-1 py-2.5 text-xs font-bold border-b-2 transition flex items-center justify-center gap-1.5 ${
-                  scheduleActiveTab === 'daily'
-                    ? 'border-sky-600 text-sky-600 bg-sky-50/50'
-                    : 'border-transparent text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                <Clock className="w-4 h-4" />
-                <span>2. Daily Hours & Break Times</span>
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveSchedule} className="space-y-4 text-xs">
-              {/* TAB 1: WEEKLY WORKING & FREE DAYS */}
-              {scheduleActiveTab === 'weekly' && (
-                <div className="space-y-4 animate-in fade-in-50">
-                  <div className="bg-sky-50/70 border border-sky-200 rounded-2xl p-3.5 text-slate-700 space-y-1">
-                    <div className="font-bold text-sky-950 flex items-center gap-1.5">
-                      <span>Weekly Consultation Availability</span>
-                    </div>
-                    <p className="text-[11px] text-slate-600 leading-relaxed">
-                      Select which days of the week you take outpatient consultations. Any unchecked day will be automatically registered as your <strong>Weekly Free / Off Day</strong> (patients will see you are off and cannot book appointments on those days).
-                    </p>
-                  </div>
-
-                  {/* Quick Day Presets */}
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-1.5">Quick Day Presets:</label>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleSetDaysPreset('weekdays')}
-                        className="px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-xs transition"
-                      >
-                        Mon – Fri (Sat & Sun Free)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleSetDaysPreset('mon_sat')}
-                        className="px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-xs transition"
-                      >
-                        Mon – Sat (Sun Free)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleSetDaysPreset('all')}
-                        className="px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-xs transition"
-                      >
-                        All 7 Days Active
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* 7 Day Selector Cards */}
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-2">
-                      Click days to toggle between Consulting and Free Day:
-                    </label>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
-                      {ALL_DAYS_OF_WEEK.map(day => {
-                        const isAvailable = scheduleForm.availableDays.includes(day);
-                        return (
-                          <div
-                            key={day}
-                            onClick={() => handleToggleDay(day)}
-                            className={`p-3 rounded-2xl border-2 transition cursor-pointer flex flex-col justify-between gap-2 ${
-                              isAvailable
-                                ? 'bg-emerald-50/80 border-emerald-400 shadow-xs'
-                                : 'bg-amber-50/70 border-amber-300'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="font-extrabold text-slate-900 text-sm">{day}</span>
-                              <span className="text-base">{isAvailable ? '🩺' : '🏖️'}</span>
-                            </div>
-                            <div>
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full inline-block ${
-                                isAvailable
-                                  ? 'bg-emerald-200/70 text-emerald-900'
-                                  : 'bg-amber-200/70 text-amber-900'
-                              }`}>
-                                {isAvailable ? 'Consulting Day' : 'Weekly Free Day'}
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Weekly Live Summary */}
-                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-1.5">
-                    <div className="flex items-center justify-between text-xs font-bold text-slate-800">
-                      <span>Schedule Breakdown:</span>
-                      <span className="text-sky-700">{scheduleForm.availableDays.length} Working / {7 - scheduleForm.availableDays.length} Free</span>
-                    </div>
-                    <div className="text-[11px] text-slate-600 space-y-1">
-                      <div>
-                        <strong className="text-emerald-700">🩺 Active Consultation Days: </strong>
-                        <span>{scheduleForm.availableDays.join(', ')}</span>
-                      </div>
-                      <div>
-                        <strong className="text-amber-800">🏖️ Weekly Free / Off Days: </strong>
-                        <span>
-                          {ALL_DAYS_OF_WEEK.filter(d => !scheduleForm.availableDays.includes(d)).length > 0
-                            ? ALL_DAYS_OF_WEEK.filter(d => !scheduleForm.availableDays.includes(d)).join(', ')
-                            : 'None (Available 7 days/week)'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+        return (
+          <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full p-6 border-2 border-sky-400 space-y-4 animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-center border-b border-sky-100 pb-3">
+                <div className="flex items-center gap-2 text-sky-950 font-bold text-base">
+                  <Calendar className="w-5 h-5 text-sky-600" />
+                  <span>My Weekly Schedule, Free Days & Daily Hours</span>
                 </div>
-              )}
+                <button onClick={() => setShowScheduleModal(false)} className="text-slate-400 hover:text-slate-600">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
 
-              {/* TAB 2: DAILY HOURS & BREAK TIMES */}
-              {scheduleActiveTab === 'daily' && (
-                <div className="space-y-4 animate-in fade-in-50">
-                  {/* Daily Shift Presets */}
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-1.5">Daily Shift Presets:</label>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleSetSlotsPreset('full_day')}
-                        className="px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-xs transition"
-                      >
-                        Full Day (09:00 AM – 07:00 PM)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleSetSlotsPreset('morning')}
-                        className="px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-xs transition"
-                      >
-                        Morning Only (09:00 AM – 12:00 PM)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleSetSlotsPreset('afternoon')}
-                        className="px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-xs transition"
-                      >
-                        Afternoon (02:00 PM – 05:00 PM)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleSetSlotsPreset('evening')}
-                        className="px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-xs transition"
-                      >
-                        Evening (04:00 PM – 07:00 PM)
-                      </button>
+              {/* Modal Tabs */}
+              <div className="flex border-b border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setScheduleActiveTab('weekly')}
+                  className={`flex-1 py-2.5 text-xs font-bold border-b-2 transition flex items-center justify-center gap-1.5 ${
+                    scheduleActiveTab === 'weekly'
+                      ? 'border-sky-600 text-sky-600 bg-sky-50/50'
+                      : 'border-transparent text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  <Calendar className="w-4 h-4" />
+                  <span>1. Weekly Working & Free Days</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setScheduleActiveTab('daily')}
+                  className={`flex-1 py-2.5 text-xs font-bold border-b-2 transition flex items-center justify-center gap-1.5 ${
+                    scheduleActiveTab === 'daily'
+                      ? 'border-sky-600 text-sky-600 bg-sky-50/50'
+                      : 'border-transparent text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  <Clock className="w-4 h-4" />
+                  <span>2. Daily Hours & Break Times</span>
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveSchedule} className="space-y-4 text-xs">
+                {/* TAB 1: WEEKLY WORKING & FREE DAYS */}
+                {scheduleActiveTab === 'weekly' && (
+                  <div className="space-y-4 animate-in fade-in-50">
+                    <div className="bg-sky-50/70 border border-sky-200 rounded-2xl p-3.5 text-slate-700 space-y-1">
+                      <div className="font-bold text-sky-950 flex items-center gap-1.5">
+                        <span>Weekly Consultation Availability</span>
+                      </div>
+                      <p className="text-[11px] text-slate-600 leading-relaxed">
+                        Select which days of the week you take outpatient consultations. Any unchecked day will be automatically registered as your <strong>Weekly Free / Off Day</strong> (patients will see you are off and cannot book appointments on those days).
+                      </p>
                     </div>
-                  </div>
 
-                  {/* Consultation Duration */}
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-1">Standard Consultation Duration</label>
-                    <div className="grid grid-cols-2 gap-3">
-                      {[15, 30].map(mins => (
+                    {/* Quick Day Presets */}
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1.5">Quick Day Presets:</label>
+                      <div className="flex flex-wrap gap-2">
                         <button
-                          key={mins}
                           type="button"
-                          onClick={() => setScheduleForm(prev => ({ ...prev, slotDurationMinutes: mins }))}
-                          className={`py-2 px-3 rounded-xl font-bold border transition text-center ${
-                            scheduleForm.slotDurationMinutes === mins
-                              ? 'bg-sky-600 text-white border-sky-600 shadow'
-                              : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                          }`}
+                          onClick={() => handleSetDaysPreset('weekdays')}
+                          className="px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-xs transition"
                         >
-                          {mins} Minutes / Patient
+                          Mon – Fri (Sat & Sun Free)
                         </button>
-                      ))}
+                        <button
+                          type="button"
+                          onClick={() => handleSetDaysPreset('mon_sat')}
+                          className="px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-xs transition"
+                        >
+                          Mon – Sat (Sun Free)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSetDaysPreset('all')}
+                          className="px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-xs transition"
+                        >
+                          All 7 Days Active
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 7 Day Selector Cards */}
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-2">
+                        Click days to toggle between Consulting and Free Day:
+                      </label>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+                        {ALL_DAYS_OF_WEEK.map(day => {
+                          const isAvailable = activeDays.includes(day);
+                          return (
+                            <div
+                              key={day}
+                              onClick={() => handleToggleDay(day)}
+                              className={`p-3 rounded-2xl border-2 transition cursor-pointer flex flex-col justify-between gap-2 ${
+                                isAvailable
+                                  ? 'bg-emerald-50/80 border-emerald-400 shadow-xs'
+                                  : 'bg-amber-50/70 border-amber-300'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="font-extrabold text-slate-900 text-sm">{day}</span>
+                                <span className="text-base">{isAvailable ? '🩺' : '🏖️'}</span>
+                              </div>
+                              <div>
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full inline-block ${
+                                  isAvailable
+                                    ? 'bg-emerald-200/70 text-emerald-900'
+                                    : 'bg-amber-200/70 text-amber-900'
+                                }`}>
+                                  {isAvailable ? 'Consulting Day' : 'Weekly Free Day'}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Weekly Live Summary */}
+                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-1.5">
+                      <div className="flex items-center justify-between text-xs font-bold text-slate-800">
+                        <span>Schedule Breakdown:</span>
+                        <span className="text-sky-700">{activeDays.length} Working / {7 - activeDays.length} Free</span>
+                      </div>
+                      <div className="text-[11px] text-slate-600 space-y-1">
+                        <div>
+                          <strong className="text-emerald-700">🩺 Active Consultation Days: </strong>
+                          <span>{activeDays.length > 0 ? activeDays.join(', ') : 'None'}</span>
+                        </div>
+                        <div>
+                          <strong className="text-amber-800">🏖️ Weekly Free / Off Days: </strong>
+                          <span>{freeDays.length > 0 ? freeDays.join(', ') : 'None (Available 7 days/week)'}</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
+                )}
 
-                  {/* Interactive Daily Slots Grid */}
-                  <div>
-                    <div className="flex justify-between items-center mb-1">
-                      <label className="font-bold text-slate-700">
-                        Daily Consultation Slots ({scheduleForm.slotTimes.length} Active Slots)
-                      </label>
-                      <span className="text-[10px] text-slate-400">Click to include/exclude from daily schedule</span>
+                {/* TAB 2: DAILY HOURS & BREAK TIMES */}
+                {scheduleActiveTab === 'daily' && (
+                  <div className="space-y-4 animate-in fade-in-50">
+                    {/* Daily Shift Presets */}
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1.5">Daily Shift Presets:</label>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleSetSlotsPreset('full_day')}
+                          className="px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-xs transition"
+                        >
+                          Full Day (09:00 AM – 07:00 PM)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSetSlotsPreset('morning')}
+                          className="px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-xs transition"
+                        >
+                          Morning (09:00 AM – 12:00 PM)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSetSlotsPreset('afternoon')}
+                          className="px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-xs transition"
+                        >
+                          Afternoon (02:00 PM – 05:00 PM)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSetSlotsPreset('evening')}
+                          className="px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-xs transition"
+                        >
+                          Evening (04:00 PM – 07:00 PM)
+                        </button>
+                      </div>
                     </div>
-                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 max-h-48 overflow-y-auto p-1 border border-slate-200 rounded-2xl bg-slate-50/50">
-                      {ALL_STANDARD_CONSULTATION_SLOTS.map(slot => {
-                        const isActive = scheduleForm.slotTimes.includes(slot);
-                        const isBreak = scheduleForm.breakTimes.includes(slot);
-                        return (
-                          <div
-                            key={slot}
-                            className={`p-2 rounded-xl border text-center transition flex flex-col justify-between gap-1 ${
-                              !isActive
-                                ? 'bg-slate-100 border-slate-200 text-slate-400 opacity-60'
-                                : isBreak
-                                ? 'bg-amber-50 border-amber-300 text-amber-900 shadow-xs'
-                                : 'bg-emerald-50 border-emerald-400 text-emerald-900 shadow-xs'
+
+                    {/* Consultation Duration */}
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">Standard Consultation Duration</label>
+                      <div className="grid grid-cols-2 gap-3">
+                        {[15, 30].map(mins => (
+                          <button
+                            key={mins}
+                            type="button"
+                            onClick={() => setScheduleForm(prev => ({ ...prev, slotDurationMinutes: mins }))}
+                            className={`py-2 px-3 rounded-xl font-bold border transition text-center ${
+                              scheduleForm.slotDurationMinutes === mins
+                                ? 'bg-sky-600 text-white border-sky-600 shadow'
+                                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
                             }`}
                           >
-                            <button
-                              type="button"
-                              onClick={() => handleToggleSlotActive(slot)}
-                              className="font-bold text-xs"
+                            {mins} Minutes / Patient
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Interactive Daily Slots Grid */}
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="font-bold text-slate-700">
+                          Daily Consultation Slots ({activeSlots.length} Active Slots)
+                        </label>
+                        <span className="text-[10px] text-slate-400">Click time to include/exclude; click Break to toggle break</span>
+                      </div>
+                      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 max-h-48 overflow-y-auto p-1 border border-slate-200 rounded-2xl bg-slate-50/50">
+                        {ALL_STANDARD_CONSULTATION_SLOTS.map(slot => {
+                          const isActive = activeSlots.includes(slot);
+                          const isBreak = currentBreaks.includes(slot);
+                          return (
+                            <div
+                              key={slot}
+                              className={`p-2 rounded-xl border text-center transition flex flex-col justify-between gap-1 ${
+                                !isActive
+                                  ? 'bg-slate-100 border-slate-200 text-slate-400 opacity-60'
+                                  : isBreak
+                                  ? 'bg-amber-50 border-amber-300 text-amber-900 shadow-xs'
+                                  : 'bg-emerald-50 border-emerald-400 text-emerald-900 shadow-xs'
+                              }`}
                             >
-                              {slot}
-                            </button>
-                            <div className="flex items-center justify-center gap-1">
-                              {isActive ? (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleToggleBreakSlot(slot);
-                                  }}
-                                  title="Toggle Break status"
-                                  className={`text-[9px] font-bold px-1.5 py-0.5 rounded transition ${
-                                    isBreak
-                                      ? 'bg-amber-200 text-amber-950 font-extrabold'
-                                      : 'bg-emerald-200 text-emerald-900 hover:bg-amber-100'
-                                  }`}
-                                >
-                                  {isBreak ? '☕ Break' : '🩺 Active'}
-                                </button>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => handleToggleSlotActive(slot)}
-                                  className="text-[9px] text-slate-500 font-semibold hover:text-sky-600"
-                                >
-                                  + Enable
-                                </button>
-                              )}
+                              <button
+                                type="button"
+                                onClick={() => handleToggleSlotActive(slot)}
+                                className="font-bold text-xs hover:underline"
+                              >
+                                {slot}
+                              </button>
+                              <div className="flex items-center justify-center gap-1">
+                                {isActive ? (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleToggleBreakSlot(slot);
+                                    }}
+                                    title="Toggle Break status"
+                                    className={`text-[9px] font-bold px-1.5 py-0.5 rounded transition ${
+                                      isBreak
+                                        ? 'bg-amber-200 text-amber-950 font-extrabold'
+                                        : 'bg-emerald-200 text-emerald-900 hover:bg-amber-100'
+                                    }`}
+                                  >
+                                    {isBreak ? '☕ Break' : '🩺 Active'}
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleSlotActive(slot)}
+                                    className="text-[9px] text-slate-500 font-semibold hover:text-sky-600"
+                                  >
+                                    + Enable
+                                  </button>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Break Reason & Notice */}
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">Scheduled Break Purpose / Notice</label>
+                      <input
+                        type="text"
+                        required
+                        value={scheduleForm.breakReason || ''}
+                        onChange={(e) => setScheduleForm(prev => ({ ...prev, breakReason: e.target.value }))}
+                        placeholder="e.g. Lunch & Inpatient Ward Rounds, Emergency OT Standby"
+                        className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-sky-500 font-medium"
+                      />
                     </div>
                   </div>
+                )}
 
-                  {/* Break Reason & Notice */}
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-1">Scheduled Break Purpose / Notice</label>
-                    <input
-                      type="text"
-                      required
-                      value={scheduleForm.breakReason}
-                      onChange={(e) => setScheduleForm(prev => ({ ...prev, breakReason: e.target.value }))}
-                      placeholder="e.g. Lunch & Inpatient Ward Rounds, Emergency OT Standby"
-                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-sky-500 font-medium"
-                    />
+                <div className="flex justify-between items-center pt-3 border-t border-slate-100">
+                  <span className="text-[11px] text-slate-400">
+                    All updates take effect immediately on patient booking portal.
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowScheduleModal(false)}
+                      className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={submittingSchedule}
+                      className="px-5 py-2.5 rounded-xl text-xs font-bold bg-sky-600 hover:bg-sky-500 text-white shadow-md transition flex items-center gap-1.5"
+                    >
+                      <Check className="w-4 h-4" />
+                      <span>{submittingSchedule ? 'Saving Schedule...' : 'Save Availability & Hours'}</span>
+                    </button>
                   </div>
                 </div>
-              )}
-
-              <div className="flex justify-between items-center pt-3 border-t border-slate-100">
-                <span className="text-[11px] text-slate-400">
-                  All updates take effect immediately on patient booking portal.
-                </span>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowScheduleModal(false)}
-                    className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={submittingSchedule}
-                    className="px-5 py-2.5 rounded-xl text-xs font-bold bg-sky-600 hover:bg-sky-500 text-white shadow-md transition flex items-center gap-1.5"
-                  >
-                    <Check className="w-4 h-4" />
-                    <span>{submittingSchedule ? 'Saving Schedule...' : 'Save Availability & Hours'}</span>
-                  </button>
-                </div>
-              </div>
-            </form>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 };
